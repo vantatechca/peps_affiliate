@@ -16,6 +16,8 @@ router.post('/order-paid', async (req: Request, res: Response) => {
       external_order_id,
     } = req.body;
 
+    console.log('📥 Webhook received:', JSON.stringify(req.body));
+
     // Validate required fields
     if (!customer_first_name || !order_total) {
       return res.status(400).json({ error: 'customer_first_name and order_total are required' });
@@ -27,16 +29,53 @@ router.post('/order-paid', async (req: Request, res: Response) => {
 
     // Look up discount code if provided
     if (discount_code) {
+      const codeToFind = discount_code.toString().trim().toUpperCase();
+      console.log(`🔍 Looking up discount code: "${codeToFind}"`);
+
+      // Try exact match first
       discountCodeRecord = await prisma.discountCode.findUnique({
-        where: { code: discount_code.toUpperCase() },
+        where: { code: codeToFind },
         include: { affiliate: true },
       });
 
+      // If no exact match, try partial match (code might have extra text)
+      if (!discountCodeRecord) {
+        console.log('🔍 Exact match failed, trying partial match...');
+        discountCodeRecord = await prisma.discountCode.findFirst({
+          where: {
+            code: {
+              contains: codeToFind,
+              mode: 'insensitive',
+            },
+          },
+          include: { affiliate: true },
+        });
+      }
+
+      // If still no match, try if the incoming code contains any of our codes
+      if (!discountCodeRecord) {
+        console.log('🔍 Partial match failed, checking if code contains any known codes...');
+        const allCodes = await prisma.discountCode.findMany({
+          include: { affiliate: true },
+        });
+        for (const c of allCodes) {
+          if (codeToFind.includes(c.code.toUpperCase())) {
+            discountCodeRecord = c;
+            console.log(`✅ Found embedded code: ${c.code}`);
+            break;
+          }
+        }
+      }
+
       if (discountCodeRecord) {
+        console.log(`✅ Code matched: ${discountCodeRecord.code} → Affiliate: ${discountCodeRecord.affiliate.name}`);
+
         const now = new Date();
         const isActive = discountCodeRecord.active;
         const isNotExpired = !discountCodeRecord.expiresAt || discountCodeRecord.expiresAt > now;
         const affiliateActive = discountCodeRecord.affiliate.active;
+
+        console.log(`   Active: ${isActive}, Not expired: ${isNotExpired}, Affiliate active: ${affiliateActive}`);
 
         if (isActive && isNotExpired && affiliateActive) {
           attributed = true;
@@ -48,8 +87,16 @@ router.post('/order-paid', async (req: Request, res: Response) => {
             0.20;
 
           commissionEarned = parseFloat((order_total * commissionRate).toFixed(2));
+          console.log(`💰 Commission: ${commissionRate * 100}% of $${order_total} = $${commissionEarned}`);
         }
+      } else {
+        console.log(`❌ No matching code found for: "${codeToFind}"`);
+        // List all codes in DB for debugging
+        const allCodes = await prisma.discountCode.findMany({ select: { code: true } });
+        console.log('📋 Codes in database:', allCodes.map(c => c.code).join(', '));
       }
+    } else {
+      console.log('ℹ️ No discount code provided in webhook');
     }
 
     // Create order record
@@ -67,7 +114,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
     });
 
     console.log(
-      `Order received: ${order.id} | Code: ${discount_code || 'none'} | Attributed: ${attributed} | Commission: $${commissionEarned}`
+      `✅ Order saved: ${order.id} | Code: ${discount_code || 'none'} | Attributed: ${attributed} | Commission: $${commissionEarned}`
     );
 
     res.json({

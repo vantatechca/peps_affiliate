@@ -52,6 +52,7 @@ router.post('/affiliates', async (req: Request, res: Response) => {
         email: email.toLowerCase(),
         name,
         passwordHash,
+        passwordPlain: password,
         role: 'AFFILIATE',
         defaultCommissionRate: defaultCommissionRate ?? 0.20,
       },
@@ -62,6 +63,7 @@ router.post('/affiliates', async (req: Request, res: Response) => {
       email: affiliate.email,
       name: affiliate.name,
       defaultCommissionRate: affiliate.defaultCommissionRate,
+      passwordPlain: affiliate.passwordPlain,
     });
   } catch (error) {
     console.error('Create affiliate error:', error);
@@ -80,7 +82,10 @@ router.patch('/affiliates/:id', async (req: Request, res: Response) => {
     if (email !== undefined) data.email = email.toLowerCase();
     if (defaultCommissionRate !== undefined) data.defaultCommissionRate = defaultCommissionRate;
     if (active !== undefined) data.active = active;
-    if (password) data.passwordHash = await bcrypt.hash(password, 10);
+    if (password) {
+      data.passwordHash = await bcrypt.hash(password, 10);
+      data.passwordPlain = password;
+    }
 
     const affiliate = await prisma.user.update({ where: { id }, data });
 
@@ -90,6 +95,7 @@ router.patch('/affiliates/:id', async (req: Request, res: Response) => {
       name: affiliate.name,
       defaultCommissionRate: affiliate.defaultCommissionRate,
       active: affiliate.active,
+      passwordPlain: affiliate.passwordPlain,
     });
   } catch (error) {
     console.error('Update affiliate error:', error);

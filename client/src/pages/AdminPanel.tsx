@@ -315,6 +315,7 @@ function AffiliatesTab() {
         <table className="w-full text-sm">
           <thead><tr className="border-b border-gray-100 text-left text-gray-500">
             <th className="px-4 py-2 font-medium">Name</th><th className="px-4 py-2 font-medium">Email</th>
+            <th className="px-4 py-2 font-medium">Password</th>
             <th className="px-4 py-2 font-medium">Commission</th><th className="px-4 py-2 font-medium">Codes</th>
             <th className="px-4 py-2 font-medium">Status</th><th className="px-4 py-2 font-medium">Actions</th>
           </tr></thead>
@@ -323,6 +324,7 @@ function AffiliatesTab() {
               <tr key={a.id} className="border-b border-gray-50">
                 <td className="px-4 py-3 text-gray-900 font-medium">{a.name}</td>
                 <td className="px-4 py-3 text-gray-600">{a.email}</td>
+                <td className="px-4 py-3"><PasswordCell password={a.passwordPlain} /></td>
                 <td className="px-4 py-3 text-gray-600">{formatPct(a.defaultCommissionRate)}</td>
                 <td className="px-4 py-3 text-gray-600">{a.discountCodes?.length || 0}</td>
                 <td className="px-4 py-3"><span className={`text-xs font-medium ${a.active ? 'text-green-700' : 'text-gray-400'}`}>{a.active ? 'Active' : 'Inactive'}</span></td>
@@ -337,7 +339,7 @@ function AffiliatesTab() {
           {affiliates.length > 0 && (
             <tfoot>
               <tr className="bg-gray-50 border-t border-gray-200">
-                <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={3}>Total ({affiliates.length} affiliates)</td>
+                <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={4}>Total ({affiliates.length} affiliates)</td>
                 <td className="px-4 py-3 text-gray-900 font-semibold text-sm">{affiliates.reduce((s, a) => s + (a.discountCodes?.length || 0), 0)} codes</td>
                 <td className="px-4 py-3 text-gray-900 font-semibold text-sm">{affiliates.filter(a => a.active).length} active</td>
                 <td className="px-4 py-3"></td>
@@ -619,6 +621,38 @@ function PayoutsTab() {
         </table>
         {payouts.length === 0 && <div className="px-4 py-8 text-sm text-gray-400 text-center">No payouts yet</div>}
       </div>
+    </div>
+  );
+}
+
+// ============ PASSWORD CELL ============
+
+function PasswordCell({ password }: { password: string | null }) {
+  const [visible, setVisible] = useState(false);
+
+  if (!password) return <span className="text-gray-400 text-xs">Not set</span>;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="font-mono text-xs text-gray-600">{visible ? password : '••••••••'}</span>
+      <button
+        onClick={() => setVisible(!visible)}
+        className="text-gray-400 hover:text-gray-700 text-xs p-0.5"
+        title={visible ? 'Hide password' : 'Show password'}
+      >
+        {visible ? (
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        )}
+      </button>
     </div>
   );
 }
