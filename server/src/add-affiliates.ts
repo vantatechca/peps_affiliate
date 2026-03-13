@@ -178,13 +178,6 @@ const AFFILIATES = [
     codes: [{ code: 'KARTER10', discountPercent: 0.10, label: null }],
   },
   {
-    name: 'Karter',
-    email: 'karter@affiliate.com',
-    password: 'karter_peps',
-    commissionRate: 0.20,
-    codes: [{ code: 'KARTER10', discountPercent: 0.10, label: null }],
-  },
-  {
     name: 'Spina',
     email: 'spina@affiliate.com',
     password: 'spina_peps',
