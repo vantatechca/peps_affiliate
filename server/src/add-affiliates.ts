@@ -211,6 +211,20 @@ const AFFILIATES = [
     password: 'sk_peps',
     commissionRate: 0.20,
     codes: [{ code: 'SK', discountPercent: 0.10, label: null }],
+  },
+  {
+    name: 'Eli',
+    email: 'eli@affiliate.com',
+    password: 'eli_peps',
+    commissionRate: 0.20,
+    codes: [{ code: 'ELI', discountPercent: 0.10, label: null }],
+  },
+  {
+    name: 'TJ',
+    email: 'tj@affiliate.com',
+    password: 'tj_peps',
+    commissionRate: 0.20,
+    codes: [{ code: 'TJWIN', discountPercent: 0.10, label: null }],
   }
 ];
 
