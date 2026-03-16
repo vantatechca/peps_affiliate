@@ -184,6 +184,34 @@ const AFFILIATES = [
     commissionRate: 0.20,
     codes: [{ code: 'SPINA10', discountPercent: 0.10, label: null }],
   },
+  {
+    name: 'Cole',
+    email: 'cole@affiliate.com',
+    password: 'cole_peps',
+    commissionRate: 0.20,
+    codes: [{ code: 'COLE10', discountPercent: 0.10, label: null }],
+  },
+  {
+    name: 'JD',
+    email: 'jd@affiliate.com',
+    password: 'jd_peps',
+    commissionRate: 0.20,
+    codes: [{ code: 'JD', discountPercent: 0.10, label: null }],
+  },
+  {
+    name: 'Ada Peschanskiy',
+    email: 'ada@affiliate.com',
+    password: 'ada_peps',
+    commissionRate: 0.20,
+    codes: [{ code: 'ADA10', discountPercent: 0.10, label: null }],
+  },
+  {
+    name: 'SK',
+    email: 'sk@affiliate.com',
+    password: 'sk_peps',
+    commissionRate: 0.20,
+    codes: [{ code: 'SK', discountPercent: 0.10, label: null }],
+  }
 ];
 
 async function main() {
