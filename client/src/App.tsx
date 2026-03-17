@@ -4,7 +4,12 @@ import Login from './pages/Login';
 import AffiliateDashboard from './pages/AffiliateDashboard';
 import AdminPanel from './pages/AdminPanel';
 
-function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) {
+function getDefaultRoute(role: string) {
+  if (role === 'SUPER_ADMIN' || role === 'ADMIN') return '/admin';
+  return '/dashboard';
+}
+
+function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -13,8 +18,8 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
 
   if (!user) return <Navigate to="/login" replace />;
 
-  if (requiredRole && user.role !== requiredRole) {
-    return <Navigate to={user.role === 'ADMIN' ? '/admin' : '/dashboard'} replace />;
+  if (!allowedRoles.includes(user.role)) {
+    return <Navigate to={getDefaultRoute(user.role)} replace />;
   }
 
   return <>{children}</>;
@@ -25,9 +30,9 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to={user.role === 'ADMIN' ? '/admin' : '/dashboard'} /> : <Login />} />
-      <Route path="/dashboard" element={<ProtectedRoute requiredRole="AFFILIATE"><AffiliateDashboard /></ProtectedRoute>} />
-      <Route path="/admin/*" element={<ProtectedRoute requiredRole="ADMIN"><AdminPanel /></ProtectedRoute>} />
+      <Route path="/login" element={user ? <Navigate to={getDefaultRoute(user.role)} /> : <Login />} />
+      <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['AFFILIATE']}><AffiliateDashboard /></ProtectedRoute>} />
+      <Route path="/admin/*" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminPanel /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
