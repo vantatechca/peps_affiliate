@@ -28,12 +28,12 @@ const ADMIN_TUTORIAL_STEPS: TutorialStep[] = [
 
 export default function AdminPanel() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState<'overview' | 'affiliates' | 'codes' | 'orders' | 'payouts' | 'admins'>('overview');
+  const [tab, setTab] = useState<'overview' | 'affiliates' | 'codes' | 'orders' | 'payouts' | 'admins' | 'logs'>('overview');
   const [viewAsUserId, setViewAsUserId] = useState<string | null>(null);
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   const tabs = isSuperAdmin
-    ? (['overview', 'affiliates', 'codes', 'orders', 'payouts', 'admins'] as const)
+    ? (['overview', 'affiliates', 'codes', 'orders', 'payouts', 'admins', 'logs'] as const)
     : (['overview', 'affiliates', 'codes', 'orders', 'payouts'] as const);
 
   return (
@@ -67,6 +67,7 @@ export default function AdminPanel() {
         {tab === 'orders' && <OrdersTab />}
         {tab === 'payouts' && <PayoutsTab />}
         {tab === 'admins' && isSuperAdmin && <AdminsTab onViewAs={setViewAsUserId} />}
+        {tab === 'logs' && isSuperAdmin && <LogsTab />}
       </div>
       <Tutorial steps={ADMIN_TUTORIAL_STEPS} storageKey="tutorial_admin" />
       {viewAsUserId && <ViewAsModal userId={viewAsUserId} onClose={() => setViewAsUserId(null)} />}
@@ -941,6 +942,320 @@ function Input({ label, value, onChange, type = 'text', required = false, placeh
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900"
         required={required} placeholder={placeholder} step={type === 'number' ? 'any' : undefined} />
+    </div>
+  );
+}
+
+// ============ LOGS TAB ============
+
+const ACTION_LABELS: Record<string, { label: string; color: string }> = {
+  LOGIN: { label: 'Login', color: 'bg-blue-100 text-blue-700' },
+  LOGIN_FAILED: { label: 'Login Failed', color: 'bg-red-100 text-red-700' },
+  CREATE_AFFILIATE: { label: 'Create Affiliate', color: 'bg-green-100 text-green-700' },
+  UPDATE_AFFILIATE: { label: 'Update Affiliate', color: 'bg-yellow-100 text-yellow-700' },
+  DELETE_AFFILIATE: { label: 'Delete Affiliate', color: 'bg-red-100 text-red-700' },
+  CREATE_CODE: { label: 'Create Code', color: 'bg-green-100 text-green-700' },
+  UPDATE_CODE: { label: 'Update Code', color: 'bg-yellow-100 text-yellow-700' },
+  DELETE_CODE: { label: 'Delete Code', color: 'bg-red-100 text-red-700' },
+  DELETE_ORDER: { label: 'Delete Order', color: 'bg-red-100 text-red-700' },
+  CREATE_PAYOUT: { label: 'Create Payout', color: 'bg-green-100 text-green-700' },
+  UPDATE_PAYOUT: { label: 'Update Payout', color: 'bg-yellow-100 text-yellow-700' },
+  CREATE_ADMIN: { label: 'Create Admin', color: 'bg-purple-100 text-purple-700' },
+  UPDATE_ADMIN: { label: 'Update Admin', color: 'bg-purple-100 text-purple-700' },
+  DELETE_ADMIN: { label: 'Delete Admin', color: 'bg-red-100 text-red-700' },
+  VIEW_AS: { label: 'View As', color: 'bg-indigo-100 text-indigo-700' },
+};
+
+const LEVEL_STYLES: Record<string, string> = {
+  INFO: 'bg-blue-100 text-blue-700',
+  WARN: 'bg-yellow-100 text-yellow-700',
+  ERROR: 'bg-red-100 text-red-700',
+};
+
+function LogsTab() {
+  const [subTab, setSubTab] = useState<'activity' | 'system'>('activity');
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-4">
+        <button onClick={() => setSubTab('activity')}
+          className={`px-3 py-1.5 text-sm rounded-md ${subTab === 'activity' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:text-gray-900'}`}>
+          Activity Logs
+        </button>
+        <button onClick={() => setSubTab('system')}
+          className={`px-3 py-1.5 text-sm rounded-md ${subTab === 'system' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:text-gray-900'}`}>
+          System Logs
+        </button>
+      </div>
+      {subTab === 'activity' ? <ActivityLogsPanel /> : <SystemLogsPanel />}
+    </div>
+  );
+}
+
+function ActivityLogsPanel() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [actionFilter, setActionFilter] = useState('');
+  const [actions, setActions] = useState<string[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const limit = 30;
+
+  useEffect(() => {
+    api.getAuditActions().then(setActions);
+    api.getAuditStats().then(setStats);
+  }, []);
+
+  useEffect(() => { loadLogs(); }, [page, actionFilter, search]);
+
+  async function loadLogs() {
+    const params: any = { page: String(page), limit: String(limit) };
+    if (actionFilter) params.action = actionFilter;
+    if (search) params.search = search;
+    const data = await api.getAuditLogs(params);
+    setLogs(data.logs);
+    setTotal(data.total);
+  }
+
+  const totalPages = Math.ceil(total / limit);
+
+  return (
+    <div className="space-y-4">
+      {/* Stats cards */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Actions Today</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalToday}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Actions This Week</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalWeek}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Logins Today</p>
+            <p className="text-2xl font-bold text-blue-600 mt-1">{stats.loginsToday}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">System Errors Today</p>
+            <p className={`text-2xl font-bold mt-1 ${stats.errorsToday > 0 ? 'text-red-600' : 'text-green-600'}`}>{stats.errorsToday}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
+            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search by user, action, details..."
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900" />
+          </div>
+          <div className="min-w-[180px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Action Type</label>
+            <select value={actionFilter} onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900 bg-white">
+              <option value="">All Actions</option>
+              {actions.map(a => (
+                <option key={a} value={a}>{ACTION_LABELS[a]?.label || a}</option>
+              ))}
+            </select>
+          </div>
+          <button onClick={() => { setSearch(''); setActionFilter(''); setPage(1); }}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900">Clear</button>
+        </div>
+      </div>
+
+      {/* Log entries */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="divide-y divide-gray-100">
+          {logs.length === 0 && (
+            <div className="p-8 text-center text-gray-400 text-sm">No activity logs found</div>
+          )}
+          {logs.map((log) => {
+            const actionInfo = ACTION_LABELS[log.action] || { label: log.action, color: 'bg-gray-100 text-gray-700' };
+            const details = log.details ? JSON.parse(log.details) : null;
+            const isExpanded = expandedId === log.id;
+
+            return (
+              <div key={log.id} className="px-4 py-3 hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : log.id)}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${actionInfo.color}`}>
+                      {actionInfo.label}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm text-gray-900 font-medium">
+                        {log.userName || log.userEmail || 'System'}
+                      </span>
+                      {log.userRole && (
+                        <span className="text-xs text-gray-400 ml-1.5">({log.userRole})</span>
+                      )}
+                      {log.entity && (
+                        <span className="text-xs text-gray-500 ml-2">
+                          on {log.entity}{log.entityId ? ` #${log.entityId.substring(0, 8)}` : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {log.ipAddress && (
+                      <span className="text-xs text-gray-400 hidden md:block">{log.ipAddress}</span>
+                    )}
+                    <span className="text-xs text-gray-400 whitespace-nowrap">{formatDateTime(log.createdAt)}</span>
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                {isExpanded && details && (
+                  <div className="mt-2 ml-0 p-3 bg-gray-50 rounded text-xs font-mono text-gray-600 overflow-x-auto">
+                    <pre className="whitespace-pre-wrap">{JSON.stringify(details, null, 2)}</pre>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-500">
+            Showing {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} of {total}
+          </span>
+          <div className="flex gap-1">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-40 hover:bg-gray-50">Prev</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-40 hover:bg-gray-50">Next</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SystemLogsPanel() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [levelFilter, setLevelFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const limit = 30;
+
+  useEffect(() => { loadLogs(); }, [page, levelFilter, sourceFilter, search]);
+
+  async function loadLogs() {
+    const params: any = { page: String(page), limit: String(limit) };
+    if (levelFilter) params.level = levelFilter;
+    if (sourceFilter) params.source = sourceFilter;
+    if (search) params.search = search;
+    const data = await api.getSystemLogs(params);
+    setLogs(data.logs);
+    setTotal(data.total);
+  }
+
+  const totalPages = Math.ceil(total / limit);
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
+            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search messages, sources..."
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900" />
+          </div>
+          <div className="min-w-[130px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Level</label>
+            <select value={levelFilter} onChange={(e) => { setLevelFilter(e.target.value); setPage(1); }}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900 bg-white">
+              <option value="">All Levels</option>
+              <option value="INFO">Info</option>
+              <option value="WARN">Warning</option>
+              <option value="ERROR">Error</option>
+            </select>
+          </div>
+          <div className="min-w-[130px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Source</label>
+            <select value={sourceFilter} onChange={(e) => { setSourceFilter(e.target.value); setPage(1); }}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900 bg-white">
+              <option value="">All Sources</option>
+              <option value="WEBHOOK">Webhook</option>
+              <option value="API">API</option>
+              <option value="AUTH">Auth</option>
+              <option value="SYSTEM">System</option>
+            </select>
+          </div>
+          <button onClick={() => { setSearch(''); setLevelFilter(''); setSourceFilter(''); setPage(1); }}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900">Clear</button>
+        </div>
+      </div>
+
+      {/* Log entries */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="divide-y divide-gray-100">
+          {logs.length === 0 && (
+            <div className="p-8 text-center text-gray-400 text-sm">No system logs found</div>
+          )}
+          {logs.map((log) => {
+            const levelStyle = LEVEL_STYLES[log.level] || 'bg-gray-100 text-gray-700';
+            const details = log.details ? JSON.parse(log.details) : null;
+            const isExpanded = expandedId === log.id;
+
+            return (
+              <div key={log.id} className="px-4 py-3 hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : log.id)}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${levelStyle}`}>
+                      {log.level}
+                    </span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">
+                      {log.source}
+                    </span>
+                    <span className="text-sm text-gray-900 truncate">{log.message}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-gray-400 whitespace-nowrap">{formatDateTime(log.createdAt)}</span>
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                {isExpanded && details && (
+                  <div className="mt-2 ml-0 p-3 bg-gray-50 rounded text-xs font-mono text-gray-600 overflow-x-auto">
+                    <pre className="whitespace-pre-wrap">{JSON.stringify(details, null, 2)}</pre>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-500">
+            Showing {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} of {total}
+          </span>
+          <div className="flex gap-1">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-40 hover:bg-gray-50">Prev</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-40 hover:bg-gray-50">Next</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

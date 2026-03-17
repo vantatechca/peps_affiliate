@@ -2,10 +2,11 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../lib/prisma';
 import { authenticate, requireSuperAdmin, signToken } from '../middleware/auth';
+import { logAudit, logSystem, auditFromReq, enrichAuditUser } from '../lib/logger';
 
 const router = Router();
 
-router.use(authenticate, requireSuperAdmin);
+router.use(authenticate, requireSuperAdmin, enrichAuditUser);
 
 // ============ ADMIN MANAGEMENT ============
 
@@ -57,12 +58,15 @@ router.post('/admins', async (req: Request, res: Response) => {
       },
     });
 
+    logAudit({ ...auditFromReq(req), action: 'CREATE_ADMIN', entity: 'User', entityId: admin.id, details: { email: admin.email, name: admin.name, role: admin.role } });
+
     res.status(201).json({
       id: admin.id, email: admin.email, name: admin.name,
       role: admin.role, passwordPlain: admin.passwordPlain,
     });
   } catch (error) {
     console.error('Create admin error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Create admin error', details: { error: String(error) } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -85,12 +89,15 @@ router.patch('/admins/:id', async (req: Request, res: Response) => {
 
     const admin = await prisma.user.update({ where: { id }, data });
 
+    logAudit({ ...auditFromReq(req), action: 'UPDATE_ADMIN', entity: 'User', entityId: id, details: { changes: Object.keys(data) } });
+
     res.json({
       id: admin.id, email: admin.email, name: admin.name,
       role: admin.role, active: admin.active, passwordPlain: admin.passwordPlain,
     });
   } catch (error) {
     console.error('Update admin error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Update admin error', details: { error: String(error), adminId: req.params.id } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -102,10 +109,13 @@ router.delete('/admins/:id', async (req: Request, res: Response) => {
     if (req.params.id === req.user!.userId) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
+    const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { email: true, name: true, role: true } });
     await prisma.user.delete({ where: { id: req.params.id } });
+    logAudit({ ...auditFromReq(req), action: 'DELETE_ADMIN', entity: 'User', entityId: req.params.id, details: { deletedEmail: target?.email, deletedName: target?.name, deletedRole: target?.role } });
     res.json({ success: true });
   } catch (error) {
     console.error('Delete admin error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Delete admin error', details: { error: String(error), adminId: req.params.id } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -123,6 +133,8 @@ router.get('/view-as/:userId', async (req: Request, res: Response) => {
     });
 
     if (!user) return res.status(404).json({ error: 'User not found' });
+
+    logAudit({ ...auditFromReq(req), action: 'VIEW_AS', entity: 'User', entityId: userId, details: { targetEmail: user.email, targetName: user.name, targetRole: user.role } });
 
     if (user.role === 'AFFILIATE') {
       // Return affiliate dashboard data

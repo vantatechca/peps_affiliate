@@ -93,4 +93,16 @@ export const api = {
     request(`/super/admins/${id}`, { method: 'DELETE' }),
   viewAs: (userId: string) => request(`/super/view-as/${userId}`),
   getAllUsers: () => request('/super/all-users'),
+
+  // Logs
+  getAuditLogs: (params?: any) => {
+    const qs = new URLSearchParams(params || {}).toString();
+    return request(`/logs/audit?${qs}`);
+  },
+  getAuditStats: () => request('/logs/audit/stats'),
+  getAuditActions: () => request('/logs/audit/actions'),
+  getSystemLogs: (params?: any) => {
+    const qs = new URLSearchParams(params || {}).toString();
+    return request(`/logs/system?${qs}`);
+  },
 };
