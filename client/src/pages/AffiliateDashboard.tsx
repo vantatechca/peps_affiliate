@@ -4,9 +4,19 @@ import { api } from '../api';
 import { downloadAffiliateReport } from '../pdfReport';
 import DataTable, { Column } from '../components/DataTable';
 import OrderDetailModal from '../components/OrderDetailModal';
+import Tutorial, { TutorialStep } from '../components/Tutorial';
+import ThemeToggle from '../components/ThemeToggle';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
 } from 'recharts';
+
+const AFFILIATE_TUTORIAL_STEPS: TutorialStep[] = [
+  { target: '[data-tour="aff-stats"]', title: 'Your Earnings', content: "See your earnings at a glance — today's, this month's, all time, and pending payouts.", position: 'bottom' },
+  { target: '[data-tour="aff-charts"]', title: 'Sales Charts', content: 'View your revenue and earnings over time. Toggle between weekly and monthly views.', position: 'top' },
+  { target: '[data-tour="aff-tabs"]', title: 'Navigation', content: 'Switch between Overview (recent sales), all Orders, and your discount Codes.', position: 'bottom' },
+  { target: '[data-tour="aff-pdf"]', title: 'Download Report', content: 'Export a PDF report of your sales and earnings to share or keep for your records.', position: 'bottom' },
+  { target: '[data-tour="theme-toggle"]', title: 'Dark Mode', content: 'Toggle between light and dark mode.', position: 'left' },
+];
 
 interface DashboardData {
   codes: Array<{
@@ -99,17 +109,18 @@ export default function AffiliateDashboard() {
             <p className="text-sm text-gray-500">Welcome, {user?.name}</p>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={handleDownloadPDF}
+            <button data-tour="aff-pdf" onClick={handleDownloadPDF}
               className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">
               Download PDF Report
             </button>
+            <div data-tour="theme-toggle"><ThemeToggle /></div>
             <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-900">Sign out</button>
           </div>
         </div>
       </header>
 
       <div className="max-w-6xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div data-tour="aff-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard label="Today's Earnings" value={formatMoney(data.stats.daily.earnings)} sub={`${data.stats.daily.orders} orders`} />
           <StatCard label="This Month" value={formatMoney(data.stats.monthly.earnings)} sub={`${data.stats.monthly.orders} orders`} />
           <StatCard label="All Time Earnings" value={formatMoney(data.stats.total.earnings)} sub={`${data.stats.total.orders} orders`} />
@@ -117,7 +128,7 @@ export default function AffiliateDashboard() {
         </div>
 
         {/* Charts */}
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+        <div data-tour="aff-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium text-gray-900">Sales & Earnings</h2>
             <div className="flex gap-1 bg-gray-100 rounded p-0.5">
@@ -164,7 +175,7 @@ export default function AffiliateDashboard() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-4 bg-white border border-gray-200 rounded-lg p-1 w-fit">
+        <div data-tour="aff-tabs" className="flex gap-1 mb-4 bg-white border border-gray-200 rounded-lg p-1 w-fit">
           {(['overview', 'orders', 'codes'] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-1.5 text-sm rounded-md capitalize ${tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
@@ -229,6 +240,7 @@ export default function AffiliateDashboard() {
           </div>
         )}
       </div>
+      <Tutorial steps={AFFILIATE_TUTORIAL_STEPS} storageKey="tutorial_affiliate" />
     </div>
   );
 }

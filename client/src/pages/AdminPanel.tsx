@@ -4,6 +4,8 @@ import { api } from '../api';
 import { downloadAdminReport } from '../pdfReport';
 import DataTable, { Column } from '../components/DataTable';
 import OrderDetailModal from '../components/OrderDetailModal';
+import Tutorial, { TutorialStep } from '../components/Tutorial';
+import ThemeToggle from '../components/ThemeToggle';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area,
@@ -13,6 +15,15 @@ function formatMoney(n: number) { return `$${n.toFixed(2)}`; }
 function formatDate(d: string) { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 function formatDateTime(d: string) { return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); }
 function formatPct(n: number) { return `${(n * 100).toFixed(0)}%`; }
+
+const ADMIN_TUTORIAL_STEPS: TutorialStep[] = [
+  { target: '[data-tour="admin-tabs"]', title: 'Navigation Tabs', content: 'Switch between Overview, Affiliates, Codes, Orders, and Payouts to manage your affiliate program.', position: 'bottom' },
+  { target: '[data-tour="admin-stats"]', title: 'Dashboard Overview', content: 'See your total affiliates, orders, revenue, and commissions at a glance. Use the filter to view a specific affiliate\'s performance.', position: 'bottom' },
+  { target: '[data-tour="admin-charts"]', title: 'Revenue Charts', content: 'Toggle between weekly and monthly views to track revenue and commissions over time.', position: 'top' },
+  { target: '[data-tour="admin-filter"]', title: 'Affiliate Filter', content: 'Select an affiliate from the dropdown to view their individual performance, charts, and orders.', position: 'bottom' },
+  { target: '[data-tour="admin-pdf"]', title: 'Download Reports', content: 'Export a PDF report of all affiliate data, including orders and commissions.', position: 'bottom' },
+  { target: '[data-tour="theme-toggle"]', title: 'Dark Mode', content: 'Toggle between light and dark mode for your preferred viewing experience.', position: 'left' },
+];
 
 export default function AdminPanel() {
   const { user, logout } = useAuth();
@@ -26,11 +37,14 @@ export default function AdminPanel() {
             <h1 className="text-lg font-semibold text-gray-900">Admin Panel</h1>
             <p className="text-sm text-gray-500">{user?.name}</p>
           </div>
-          <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-900">Sign out</button>
+          <div className="flex items-center gap-3">
+            <div data-tour="theme-toggle"><ThemeToggle /></div>
+            <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-900">Sign out</button>
+          </div>
         </div>
       </header>
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex gap-1 mb-6 bg-white border border-gray-200 rounded-lg p-1 w-fit">
+        <div data-tour="admin-tabs" className="flex gap-1 mb-6 bg-white border border-gray-200 rounded-lg p-1 w-fit">
           {(['overview', 'affiliates', 'codes', 'orders', 'payouts'] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-1.5 text-sm rounded-md capitalize ${tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
@@ -44,6 +58,7 @@ export default function AdminPanel() {
         {tab === 'orders' && <OrdersTab />}
         {tab === 'payouts' && <PayoutsTab />}
       </div>
+      <Tutorial steps={ADMIN_TUTORIAL_STEPS} storageKey="tutorial_admin" />
     </div>
   );
 }
@@ -100,7 +115,7 @@ function OverviewTab() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
+        <div data-tour="admin-filter" className="flex items-center gap-3">
           <label className="text-sm text-gray-500">Filter by affiliate:</label>
           <select value={selectedAffiliate} onChange={(e) => setSelectedAffiliate(e.target.value)}
             className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[200px]">
@@ -109,7 +124,7 @@ function OverviewTab() {
           </select>
           {selectedAffiliate && <button onClick={() => setSelectedAffiliate('')} className="text-xs text-gray-500 hover:text-gray-900">Clear filter</button>}
         </div>
-        <button onClick={handleDownloadPDF} className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">Download PDF Report</button>
+        <button data-tour="admin-pdf" onClick={handleDownloadPDF} className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">Download PDF Report</button>
       </div>
 
       {selectedAffiliate && (
@@ -118,7 +133,7 @@ function OverviewTab() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div data-tour="admin-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {!selectedAffiliate && <StatCard label="Total Affiliates" value={stats.totalAffiliates} sub={`${stats.activeAffiliates} active`} />}
         <StatCard label={selectedAffiliate ? 'Their Orders' : 'Total Orders'} value={stats.attributedOrders} sub={`${stats.totalOrders} total (inc. unattributed)`} />
         <StatCard label={selectedAffiliate ? 'Their Revenue' : 'Affiliate Revenue'} value={formatMoney(stats.totalRevenue)} sub="From attributed orders" />
@@ -126,7 +141,7 @@ function OverviewTab() {
         {selectedAffiliate && <StatCard label="Pending Payout" value={formatMoney(stats.pendingPayouts)} sub="Awaiting payment" />}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+      <div data-tour="admin-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-medium text-gray-900">Revenue & Commissions</h2>
           <div className="flex gap-1 bg-gray-100 rounded p-0.5">
