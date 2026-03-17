@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
 import { downloadAdminReport } from '../pdfReport';
@@ -297,6 +297,9 @@ function AffiliatesTab() {
           columns={columns}
           data={affiliates}
           emptyMessage="No affiliates yet"
+          searchable
+          searchKeys={['name', 'email']}
+          searchPlaceholder="Search affiliates by name or email..."
           footer={affiliates.length > 0 ? (
             <tfoot>
               <tr className="bg-gray-50 border-t border-gray-200">
@@ -427,6 +430,9 @@ function CodesTab() {
           columns={columns}
           data={codes}
           emptyMessage="No discount codes yet"
+          searchable
+          searchKeys={['code', 'affiliate.name', 'label']}
+          searchPlaceholder="Search codes, affiliates, or labels..."
           footer={codes.length > 0 ? (
             <tfoot>
               <tr className="bg-gray-50 border-t border-gray-200">
@@ -449,14 +455,27 @@ function OrdersTab() {
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [filter, setFilter] = useState<'all' | 'yes' | 'no'>('all');
+  const [search, setSearch] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
+  const searchTimer = useRef<any>(null);
+
+  function handleSearch(val: string) {
+    setSearch(val);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setSearchDebounced(val);
+      setPage(1);
+    }, 400);
+  }
 
   useEffect(() => { setPage(1); }, [filter]);
-  useEffect(() => { loadOrders(); }, [page, filter]);
+  useEffect(() => { loadOrders(); }, [page, filter, searchDebounced]);
 
   function loadOrders() {
     const params: any = { page: page.toString(), limit: '50' };
     if (filter === 'yes') params.attributed = 'true';
     if (filter === 'no') params.attributed = 'false';
+    if (searchDebounced.trim()) params.search = searchDebounced.trim();
     api.getOrders(params).then(setData);
   }
 
@@ -486,16 +505,33 @@ function OrdersTab() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-medium text-gray-900">All Orders ({data.total})</h2>
-        <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1">
-          {([['all', 'All'], ['yes', 'Attributed'], ['no', 'Not Attributed']] as const).map(([val, label]) => (
-            <button
-              key={val}
-              onClick={() => setFilter(val)}
-              className={`px-3 py-1 text-xs rounded-md ${filter === val ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search orders..."
+              className="pl-9 pr-8 py-1.5 text-sm border border-gray-300 rounded w-64 focus:outline-none focus:border-gray-900"
+            />
+            {search && (
+              <button onClick={() => { setSearch(''); setSearchDebounced(''); setPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">&times;</button>
+            )}
+          </div>
+          <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1">
+            {([['all', 'All'], ['yes', 'Attributed'], ['no', 'Not Attributed']] as const).map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setFilter(val)}
+                className={`px-3 py-1 text-xs rounded-md ${filter === val ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">

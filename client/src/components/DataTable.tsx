@@ -134,14 +134,21 @@ export default function DataTable({
   footer,
   emptyMessage = 'No data',
   onRowClick,
+  searchable,
+  searchKeys,
+  searchPlaceholder = 'Search...',
 }: {
   columns: Column[];
   data: any[];
   footer?: ReactNode;
   emptyMessage?: string;
   onRowClick?: (row: any) => void;
+  searchable?: boolean;
+  searchKeys?: string[];
+  searchPlaceholder?: string;
 }) {
   const [sort, setSort] = useState<SortState | null>(null);
+  const [search, setSearch] = useState('');
   const [widths, setWidths] = useState<Record<string, number>>(() => {
     const w: Record<string, number> = {};
     columns.forEach((c) => {
@@ -163,10 +170,43 @@ export default function DataTable({
     setWidths((prev) => ({ ...prev, [key]: w }));
   }
 
-  const sorted = sortData(data, sort);
+  // Client-side search filter
+  let filtered = data;
+  if (searchable && search.trim() && searchKeys?.length) {
+    const q = search.toLowerCase();
+    filtered = data.filter((row) =>
+      searchKeys.some((key) => {
+        const val = getNestedValue(row, key);
+        return val != null && String(val).toLowerCase().includes(q);
+      })
+    );
+  }
+
+  const sorted = sortData(filtered, sort);
 
   return (
-    <div className="overflow-x-auto">
+    <div>
+      {searchable && (
+        <div className="px-4 py-3 border-b border-gray-100">
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-900"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">&times;</button>
+            )}
+          </div>
+          {search && <p className="text-xs text-gray-400 mt-1">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</p>}
+        </div>
+      )}
+      <div className="overflow-x-auto">
       <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
         <thead>
           <tr className="border-b border-gray-100">
@@ -207,9 +247,12 @@ export default function DataTable({
         </tbody>
         {footer}
       </table>
-      {data.length === 0 && (
-        <div className="px-4 py-8 text-sm text-gray-400 text-center">{emptyMessage}</div>
+      {filtered.length === 0 && (
+        <div className="px-4 py-8 text-sm text-gray-400 text-center">
+          {search ? `No results for "${search}"` : emptyMessage}
+        </div>
       )}
+      </div>
     </div>
   );
 }

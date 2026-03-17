@@ -210,7 +210,7 @@ router.delete('/codes/:id', async (req: Request, res: Response) => {
 // GET /api/admin/orders
 router.get('/orders', async (req: Request, res: Response) => {
   try {
-    const { page = '1', limit = '50', affiliateId, attributed } = req.query;
+    const { page = '1', limit = '50', affiliateId, attributed, search } = req.query;
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
     const where: any = {};
@@ -219,6 +219,16 @@ router.get('/orders', async (req: Request, res: Response) => {
     }
     if (attributed !== undefined) {
       where.attributed = attributed === 'true';
+    }
+    if (search) {
+      const s = search as string;
+      where.OR = [
+        { customerFirstName: { contains: s, mode: 'insensitive' } },
+        { itemsSummary: { contains: s, mode: 'insensitive' } },
+        { externalOrderId: { contains: s, mode: 'insensitive' } },
+        { discountCode: { code: { contains: s, mode: 'insensitive' } } },
+        { discountCode: { affiliate: { name: { contains: s, mode: 'insensitive' } } } },
+      ];
     }
 
     const [orders, total] = await Promise.all([
