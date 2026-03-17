@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
 import { downloadAffiliateReport } from '../pdfReport';
 import DataTable, { Column } from '../components/DataTable';
+import OrderDetailModal from '../components/OrderDetailModal';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
 } from 'recharts';
@@ -243,6 +244,8 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub: st
 }
 
 function OrdersTable({ orders }: { orders: Order[] }) {
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+
   const columns: Column[] = [
     { key: 'date', label: 'Date & Time', defaultWidth: 180, render: (r: any) => <span className="text-gray-500 text-xs">{formatDateTime(r.date)}</span> },
     { key: 'customerFirstName', label: 'Customer', defaultWidth: 120, className: 'text-gray-900' },
@@ -253,19 +256,28 @@ function OrdersTable({ orders }: { orders: Order[] }) {
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      data={orders}
-      emptyMessage="No orders found"
-      footer={orders.length > 0 ? (
-        <tfoot>
-          <tr className="bg-gray-50 border-t border-gray-200">
-            <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={4}>Total ({orders.length} orders)</td>
-            <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(orders.reduce((s, o) => s + o.orderTotal, 0))}</td>
-            <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(orders.reduce((s, o) => s + o.commissionEarned, 0))}</td>
-          </tr>
-        </tfoot>
-      ) : undefined}
-    />
+    <>
+      <DataTable
+        columns={columns}
+        data={orders}
+        emptyMessage="No orders found"
+        onRowClick={(row) => setSelectedOrder(row)}
+        footer={orders.length > 0 ? (
+          <tfoot>
+            <tr className="bg-gray-50 border-t border-gray-200">
+              <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={4}>Total ({orders.length} orders)</td>
+              <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(orders.reduce((s, o) => s + o.orderTotal, 0))}</td>
+              <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(orders.reduce((s, o) => s + o.commissionEarned, 0))}</td>
+            </tr>
+          </tfoot>
+        ) : undefined}
+      />
+      {selectedOrder && (
+        <OrderDetailModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+        />
+      )}
+    </>
   );
 }

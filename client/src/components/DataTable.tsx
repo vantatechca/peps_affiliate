@@ -133,11 +133,13 @@ export default function DataTable({
   data,
   footer,
   emptyMessage = 'No data',
+  onRowClick,
 }: {
   columns: Column[];
   data: any[];
   footer?: ReactNode;
   emptyMessage?: string;
+  onRowClick?: (row: any) => void;
 }) {
   const [sort, setSort] = useState<SortState | null>(null);
   const [widths, setWidths] = useState<Record<string, number>>(() => {
@@ -185,12 +187,17 @@ export default function DataTable({
         </thead>
         <tbody>
           {sorted.map((row, i) => (
-            <tr key={row.id || i} className="border-b border-gray-50 hover:bg-gray-50">
+            <tr
+              key={row.id || i}
+              className={`border-b border-gray-50 hover:bg-gray-50 ${onRowClick ? 'cursor-pointer' : ''}`}
+              onClick={() => onRowClick?.(row)}
+            >
               {columns.map((col) => (
                 <td
                   key={col.key}
                   style={{ width: widths[col.key] }}
                   className={`px-4 py-3 truncate ${col.align === 'right' ? 'text-right' : ''} ${col.className || ''}`}
+                  onClick={col.key === '_actions' ? (e) => e.stopPropagation() : undefined}
                 >
                   {col.render ? col.render(row) : getNestedValue(row, col.key) ?? '—'}
                 </td>

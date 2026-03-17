@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
 import { downloadAdminReport } from '../pdfReport';
 import DataTable, { Column } from '../components/DataTable';
+import OrderDetailModal from '../components/OrderDetailModal';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area,
@@ -446,6 +447,7 @@ function CodesTab() {
 function OrdersTab() {
   const [data, setData] = useState<{ orders: any[]; total: number }>({ orders: [], total: 0 });
   const [page, setPage] = useState(1);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [filter, setFilter] = useState<'all' | 'yes' | 'no'>('all');
 
   useEffect(() => { setPage(1); }, [filter]);
@@ -501,6 +503,7 @@ function OrdersTab() {
           columns={columns}
           data={data.orders}
           emptyMessage="No orders yet"
+          onRowClick={(row) => setSelectedOrder(row)}
           footer={data.orders.length > 0 ? (
             <tfoot>
               <tr className="bg-gray-50 border-t border-gray-200">
@@ -520,6 +523,15 @@ function OrdersTab() {
           </div>
         )}
       </div>
+
+      {selectedOrder && (
+        <OrderDetailModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          isAdmin
+          onDelete={(id) => { handleDelete(id); setSelectedOrder(null); }}
+        />
+      )}
     </div>
   );
 }
