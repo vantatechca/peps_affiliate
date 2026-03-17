@@ -82,4 +82,16 @@ export const api = {
 
   adminStats: (affiliateId?: string) =>
     request(`/admin/stats${affiliateId ? `?affiliateId=${affiliateId}` : ''}`),
+
+  // Super Admin
+  getAdmins: () => request('/super/admins'),
+  createAdmin: (data: any) =>
+    request('/super/admins', { method: 'POST', body: JSON.stringify(data) }),
+  updateAdmin: (id: string, data: any) =>
+    request(`/super/admins/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteAdmin: (id: string) =>
+    request(`/super/admins/${id}`, { method: 'DELETE' }),
+  viewAs: (userId: string) => request(`/super/view-as/${userId}`),
+  getAllUsers: () => request('/super/all-users'),
+  
 };

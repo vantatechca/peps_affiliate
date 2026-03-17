@@ -6,6 +6,7 @@ import DataTable, { Column } from '../components/DataTable';
 import OrderDetailModal from '../components/OrderDetailModal';
 import Tutorial, { TutorialStep } from '../components/Tutorial';
 import ThemeToggle from '../components/ThemeToggle';
+import ViewAsModal from '../components/ViewAsModal';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area,
@@ -27,15 +28,23 @@ const ADMIN_TUTORIAL_STEPS: TutorialStep[] = [
 
 export default function AdminPanel() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState<'overview' | 'affiliates' | 'codes' | 'orders' | 'payouts'>('overview');
+  const [tab, setTab] = useState<'overview' | 'affiliates' | 'codes' | 'orders' | 'payouts' | 'admins'>('overview');
+  const [viewAsUserId, setViewAsUserId] = useState<string | null>(null);
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
+  const tabs = isSuperAdmin
+    ? (['overview', 'affiliates', 'codes', 'orders', 'payouts', 'admins'] as const)
+    : (['overview', 'affiliates', 'codes', 'orders', 'payouts'] as const);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">Admin Panel</h1>
-            <p className="text-sm text-gray-500">{user?.name}</p>
+            <h1 className="text-lg font-semibold text-gray-900">
+              {isSuperAdmin ? 'Super Admin Panel' : 'Admin Panel'}
+            </h1>
+            <p className="text-sm text-gray-500">{user?.name} {isSuperAdmin && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded ml-1">Super</span>}</p>
           </div>
           <div className="flex items-center gap-3">
             <div data-tour="theme-toggle"><ThemeToggle /></div>
@@ -45,7 +54,7 @@ export default function AdminPanel() {
       </header>
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div data-tour="admin-tabs" className="flex gap-1 mb-6 bg-white border border-gray-200 rounded-lg p-1 w-fit">
-          {(['overview', 'affiliates', 'codes', 'orders', 'payouts'] as const).map((t) => (
+          {tabs.map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-1.5 text-sm rounded-md capitalize ${tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
               {t}
@@ -53,12 +62,14 @@ export default function AdminPanel() {
           ))}
         </div>
         {tab === 'overview' && <OverviewTab />}
-        {tab === 'affiliates' && <AffiliatesTab />}
+        {tab === 'affiliates' && <AffiliatesTab isSuperAdmin={isSuperAdmin} onViewAs={setViewAsUserId} />}
         {tab === 'codes' && <CodesTab />}
         {tab === 'orders' && <OrdersTab />}
         {tab === 'payouts' && <PayoutsTab />}
+        {tab === 'admins' && isSuperAdmin && <AdminsTab onViewAs={setViewAsUserId} />}
       </div>
       <Tutorial steps={ADMIN_TUTORIAL_STEPS} storageKey="tutorial_admin" />
+      {viewAsUserId && <ViewAsModal userId={viewAsUserId} onClose={() => setViewAsUserId(null)} />}
     </div>
   );
 }
@@ -218,7 +229,7 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 
 // ============ AFFILIATES ============
 
-function AffiliatesTab() {
+function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onViewAs?: (id: string) => void }) {
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
@@ -267,12 +278,13 @@ function AffiliatesTab() {
     { key: '_codes', label: 'Codes', defaultWidth: 80, render: (r: any) => r.discountCodes?.length || 0, className: 'text-gray-600' },
     { key: 'active', label: 'Status', defaultWidth: 90, render: (r: any) => <span className={`text-xs font-medium ${r.active ? 'text-green-700' : 'text-gray-400'}`}>{r.active ? 'Active' : 'Inactive'}</span> },
     {
-      key: '_actions', label: 'Actions', defaultWidth: 180, sortable: false,
+      key: '_actions', label: 'Actions', defaultWidth: 220, sortable: false,
       render: (r: any) => (
         <div className="flex gap-2">
           <button onClick={() => openEdit(r)} className="text-xs text-blue-600 hover:underline">Edit</button>
           <button onClick={() => toggleActive(r)} className="text-xs text-gray-500 hover:underline">{r.active ? 'Deactivate' : 'Activate'}</button>
           <button onClick={() => handleDelete(r)} className="text-xs text-red-500 hover:underline">Delete</button>
+          {isSuperAdmin && <button onClick={() => onViewAs?.(r.id)} className="text-xs text-purple-600 hover:underline">View As</button>}
         </div>
       ),
     },
@@ -670,6 +682,138 @@ function PayoutsTab() {
               </tr>
             </tfoot>
           ) : undefined}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============ ADMINS (Super Admin only) ============
+
+function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
+  const { user } = useAuth();
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'ADMIN' });
+
+  useEffect(() => { loadAdmins(); }, []);
+  async function loadAdmins() { setAdmins(await api.getAdmins()); }
+
+  function openCreate() {
+    setEditing(null);
+    setForm({ name: '', email: '', password: '', role: 'ADMIN' });
+    setShowModal(true);
+  }
+
+  function openEdit(admin: any) {
+    setEditing(admin);
+    setForm({ name: admin.name, email: admin.email, password: '', role: admin.role });
+    setShowModal(true);
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    const payload: any = { name: form.name, email: form.email, role: form.role };
+    if (editing) {
+      if (form.password) payload.password = form.password;
+      await api.updateAdmin(editing.id, payload);
+    } else {
+      payload.password = form.password;
+      await api.createAdmin(payload);
+    }
+    setShowModal(false);
+    loadAdmins();
+  }
+
+  async function toggleActive(admin: any) {
+    await api.updateAdmin(admin.id, { active: !admin.active });
+    loadAdmins();
+  }
+
+  async function handleDelete(admin: any) {
+    if (admin.id === user?.id) { alert("Can't delete your own account"); return; }
+    if (!confirm(`Delete admin "${admin.name}"?`)) return;
+    await api.deleteAdmin(admin.id);
+    loadAdmins();
+  }
+
+  const columns: Column[] = [
+    { key: 'name', label: 'Name', defaultWidth: 160, className: 'text-gray-900 font-medium' },
+    { key: 'email', label: 'Email', defaultWidth: 220, className: 'text-gray-600' },
+    { key: 'passwordPlain', label: 'Password', defaultWidth: 140, render: (r: any) => <PasswordCell password={r.passwordPlain} /> },
+    {
+      key: 'role', label: 'Role', defaultWidth: 120,
+      render: (r: any) => (
+        <span className={`text-xs font-medium px-2 py-0.5 rounded ${r.role === 'SUPER_ADMIN' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+          {r.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
+        </span>
+      ),
+    },
+    {
+      key: 'active', label: 'Status', defaultWidth: 90,
+      render: (r: any) => <span className={`text-xs font-medium ${r.active ? 'text-green-700' : 'text-gray-400'}`}>{r.active ? 'Active' : 'Inactive'}</span>,
+    },
+    {
+      key: 'createdAt', label: 'Created', defaultWidth: 130,
+      render: (r: any) => <span className="text-xs text-gray-500">{formatDate(r.createdAt)}</span>,
+    },
+    {
+      key: '_actions', label: 'Actions', defaultWidth: 200, sortable: false,
+      render: (r: any) => (
+        <div className="flex gap-2">
+          <button onClick={() => openEdit(r)} className="text-xs text-blue-600 hover:underline">Edit</button>
+          <button onClick={() => toggleActive(r)} className="text-xs text-gray-500 hover:underline">{r.active ? 'Deactivate' : 'Activate'}</button>
+          {r.id !== user?.id && <button onClick={() => handleDelete(r)} className="text-xs text-red-500 hover:underline">Delete</button>}
+          <button onClick={() => onViewAs(r.id)} className="text-xs text-purple-600 hover:underline">View As</button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-sm font-medium text-gray-900">{admins.length} Admins</h2>
+        <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Admin</button>
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-40" onClick={() => setShowModal(false)} />
+          <div className="relative bg-white rounded-lg border border-gray-200 w-full max-w-md mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-gray-900">{editing ? 'Edit' : 'New'} Admin</h3>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <Input label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
+              <Input label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
+              <Input label={editing ? 'New Password (leave blank to keep)' : 'Password'} value={form.password} onChange={(v) => setForm({ ...form, password: v })} required={!editing} />
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                  <option value="ADMIN">Admin</option>
+                  <option value="SUPER_ADMIN">Super Admin</option>
+                </select>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="submit" className="flex-1 bg-gray-900 text-white text-sm px-4 py-2.5 rounded hover:bg-gray-800 font-medium">{editing ? 'Update' : 'Create'}</button>
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 text-sm text-gray-600 px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={admins}
+          emptyMessage="No admins"
+          searchable
+          searchKeys={['name', 'email']}
+          searchPlaceholder="Search admins..."
         />
       </div>
     </div>

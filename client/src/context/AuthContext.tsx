@@ -5,7 +5,7 @@ interface User {
   id: string;
   email: string;
   name: string;
-  role: 'ADMIN' | 'AFFILIATE';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'AFFILIATE';
 }
 
 interface AuthContextType {
