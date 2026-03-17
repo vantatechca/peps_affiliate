@@ -9,7 +9,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import ViewAsModal from '../components/ViewAsModal';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  AreaChart, Area,
+  AreaChart, Area, LineChart, Line, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 
 function formatMoney(n: number) { return `$${n.toFixed(2)}`; }
@@ -28,13 +28,23 @@ const ADMIN_TUTORIAL_STEPS: TutorialStep[] = [
 
 export default function AdminPanel() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState<'overview' | 'affiliates' | 'codes' | 'orders' | 'payouts' | 'admins' | 'logs'>('overview');
+  const [tab, setTab] = useState<'business' | 'affiliates' | 'codes' | 'orders' | 'payouts' | 'admins' | 'logs'>('business');
   const [viewAsUserId, setViewAsUserId] = useState<string | null>(null);
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   const tabs = isSuperAdmin
-    ? (['overview', 'affiliates', 'codes', 'orders', 'payouts', 'admins', 'logs'] as const)
-    : (['overview', 'affiliates', 'codes', 'orders', 'payouts'] as const);
+    ? (['business', 'affiliates', 'codes', 'orders', 'payouts', 'admins', 'logs'] as const)
+    : (['business', 'affiliates', 'codes', 'orders', 'payouts'] as const);
+
+  const tabLabels: Record<string, string> = {
+    business: 'Business Overview',
+    affiliates: 'Affiliates',
+    codes: 'Codes',
+    orders: 'Orders',
+    payouts: 'Payouts',
+    admins: 'Admins',
+    logs: 'Logs',
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -56,12 +66,12 @@ export default function AdminPanel() {
         <div data-tour="admin-tabs" className="flex gap-1 mb-6 bg-white border border-gray-200 rounded-lg p-1 w-fit">
           {tabs.map((t) => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-1.5 text-sm rounded-md capitalize ${tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
-              {t}
+              className={`px-4 py-1.5 text-sm rounded-md ${tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+              {tabLabels[t] || t}
             </button>
           ))}
         </div>
-        {tab === 'overview' && <OverviewTab />}
+        {tab === 'business' && <BusinessOverviewTab />}
         {tab === 'affiliates' && <AffiliatesTab isSuperAdmin={isSuperAdmin} onViewAs={setViewAsUserId} />}
         {tab === 'codes' && <CodesTab />}
         {tab === 'orders' && <OrdersTab />}
@@ -75,129 +85,91 @@ export default function AdminPanel() {
   );
 }
 
-// ============ OVERVIEW WITH CHARTS ============
+// ============ BUSINESS OVERVIEW ============
 
-function OverviewTab() {
+const PIE_COLORS = ['#111827', '#9ca3af'];
+
+function BusinessOverviewTab() {
   const [stats, setStats] = useState<any>(null);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [topAffiliates, setTopAffiliates] = useState<any[]>([]);
   const [chartView, setChartView] = useState<'weekly' | 'monthly'>('weekly');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [recentNonAttributed, setRecentNonAttributed] = useState<any[]>([]);
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
-  const [recentNonAttributed, setRecentNonAttributed] = useState<any[]>([]);
-  const [selectedAffiliate, setSelectedAffiliate] = useState<string>('');
 
   useEffect(() => {
     api.getAffiliates().then(setAffiliates);
-    api.adminTopAffiliates().then(setTopAffiliates);
-    // Load recent non-attributed orders
     api.getOrders({ limit: '10', attributed: 'false' }).then((d) => setRecentNonAttributed(d.orders));
   }, []);
 
-  useEffect(() => { loadFilteredData(); }, [selectedAffiliate]);
+  useEffect(() => { loadData(); }, [sourceFilter]);
 
-  async function loadFilteredData() {
-    const affId = selectedAffiliate || undefined;
-    const [s, w, m] = await Promise.all([api.adminStats(affId), api.adminWeekly(affId), api.adminMonthly(affId)]);
+  async function loadData() {
+    const src = sourceFilter || undefined;
+    const [s, w, m] = await Promise.all([
+      api.businessStats(src), api.businessWeekly(src), api.businessMonthly(src),
+    ]);
     setStats(s); setWeeklyData(w); setMonthlyData(m);
     const orderParams: any = { limit: '100' };
-    if (selectedAffiliate) orderParams.affiliateId = selectedAffiliate;
     const o = await api.getOrders(orderParams);
     setOrders(o.orders);
   }
 
   function handleDownloadPDF() {
     if (!stats) return;
-    const filteredOrders = selectedAffiliate ? orders.filter((o: any) => o.attributed) : orders;
-    downloadAdminReport(stats, affiliates, filteredOrders, selectedAffiliate ? selectedName : undefined);
+    downloadAdminReport(stats, affiliates, orders);
   }
 
-  const selectedName = selectedAffiliate ? affiliates.find((a) => a.id === selectedAffiliate)?.name || 'Affiliate' : 'All Affiliates';
   if (!stats) return <div className="text-gray-500 text-sm">Loading...</div>;
+
   const chartData = chartView === 'weekly' ? weeklyData : monthlyData;
-  const conversionRate = stats.totalOrders > 0 ? ((stats.attributedOrders / stats.totalOrders) * 100).toFixed(1) : '0';
-
-  const topColumns: Column[] = [
-    { key: '_rank', label: '#', defaultWidth: 50, sortable: false, render: (_r: any) => '' },
-    { key: 'name', label: 'Name', defaultWidth: 200, className: 'text-gray-900 font-medium' },
-    { key: 'orders', label: 'Orders', align: 'right', defaultWidth: 100, className: 'text-gray-600' },
-    { key: 'revenue', label: 'Revenue', align: 'right', defaultWidth: 130, render: (r: any) => formatMoney(r.revenue), className: 'text-gray-900' },
-    { key: 'commissions', label: 'Commissions', align: 'right', defaultWidth: 130, render: (r: any) => <span className="text-green-700 font-medium">{formatMoney(r.commissions)}</span> },
-  ];
-
-  const rankedAffiliates = topAffiliates.map((a, i) => ({ ...a, _rank: i + 1 }));
+  const pieData = [
+    { name: 'Attributed', value: stats.attributedRevenue },
+    { name: 'Non-Attributed', value: stats.nonAttributedRevenue },
+  ].filter(d => d.value > 0);
 
   return (
     <div>
+      {/* Header with filters */}
       <div className="flex items-center justify-between mb-4">
-        <div data-tour="admin-filter" className="flex items-center gap-3">
-          <label className="text-sm text-gray-500">Filter by affiliate:</label>
-          <select value={selectedAffiliate} onChange={(e) => setSelectedAffiliate(e.target.value)}
-            className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[200px]">
-            <option value="">All Affiliates</option>
-            {affiliates.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-gray-500">Source:</label>
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[140px]">
+            <option value="">All Sources</option>
+            <option value="shopify">Shopify</option>
+            <option value="wordpress">WordPress</option>
           </select>
-          {selectedAffiliate && <button onClick={() => setSelectedAffiliate('')} className="text-xs text-gray-500 hover:text-gray-900">Clear filter</button>}
+          {sourceFilter && <button onClick={() => setSourceFilter('')} className="text-xs text-gray-500 hover:text-gray-900">Clear</button>}
         </div>
         <button data-tour="admin-pdf" onClick={handleDownloadPDF} className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">Download PDF Report</button>
       </div>
 
-      {selectedAffiliate && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 mb-4 text-sm text-blue-800">
-          Showing data for <span className="font-semibold">{selectedName}</span>
-        </div>
-      )}
-
-      {/* Business Overview — all orders */}
-      {!selectedAffiliate && (
-        <>
-          <div className="mb-2">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Business Overview</p>
-          </div>
-          <div data-tour="admin-stats" className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-            <StatCard label="All Orders" value={stats.totalOrders} sub="Total orders received" />
-            <StatCard label="Total Revenue" value={formatMoney(stats.allOrdersRevenue || 0)} sub="From all orders" />
-            <StatCard label="Non-Attributed" value={stats.nonAttributedCount || 0} sub="No affiliate code used" />
-            <StatCard label="Affiliate Conversion" value={`${conversionRate}%`} sub={`${stats.attributedOrders} of ${stats.totalOrders} orders`} />
-            <StatCard label="Total Affiliates" value={stats.totalAffiliates} sub={`${stats.activeAffiliates} active`} />
-          </div>
-        </>
-      )}
-
-      {/* Affiliate Performance */}
+      {/* Key Metrics */}
       <div className="mb-2">
-        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-          {selectedAffiliate ? `${selectedName}'s Performance` : 'Affiliate Performance'}
-        </p>
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Key Metrics</p>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label={selectedAffiliate ? 'Their Orders' : 'Attributed Orders'}
-          value={stats.attributedOrders}
-          sub={selectedAffiliate ? `${stats.totalOrders} total` : `${stats.totalOrders - stats.attributedOrders} without code`}
-        />
-        <StatCard
-          label={selectedAffiliate ? 'Their Revenue' : 'Affiliate Revenue'}
-          value={formatMoney(stats.totalRevenue)}
-          sub="From attributed orders"
-        />
-        <StatCard
-          label={selectedAffiliate ? 'Their Commissions' : 'Commissions Owed'}
-          value={formatMoney(stats.totalCommissions)}
-          sub={`${formatMoney(stats.pendingPayouts)} pending payout`}
-        />
-        {selectedAffiliate ? (
-          <StatCard label="Pending Payout" value={formatMoney(stats.pendingPayouts)} sub="Awaiting payment" />
-        ) : (
-          <StatCard label="Net Revenue" value={formatMoney((stats.totalRevenue || 0) - (stats.totalCommissions || 0))} sub="Revenue minus commissions" />
-        )}
+      <div data-tour="admin-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard label="Total Revenue" value={formatMoney(stats.totalRevenue)} sub={`${stats.totalOrders} total orders`} />
+        <StatCard label="Today" value={formatMoney(stats.todayRevenue)} sub={`${stats.todayOrders} orders today`} />
+        <StatCard label="This Month" value={formatMoney(stats.monthRevenue)} sub={`${stats.monthOrders} orders this month`} />
+        <StatCard label="Net Revenue" value={formatMoney(stats.netRevenue)} sub={`After ${formatMoney(stats.totalCommissions)} commissions`} />
       </div>
 
-      {/* Charts */}
+      {/* Attribution & Affiliate Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard label="Conversion Rate" value={`${stats.conversionRate.toFixed(1)}%`} sub={`${stats.attributedOrders} of ${stats.totalOrders} attributed`} />
+        <StatCard label="Non-Attributed" value={stats.nonAttributedOrders} sub={formatMoney(stats.nonAttributedRevenue)} />
+        <StatCard label="Commissions Owed" value={formatMoney(stats.totalCommissions)} sub={`${formatMoney(stats.pendingPayouts)} pending payout`} />
+        <StatCard label="Active Affiliates" value={stats.activeAffiliates} sub={`${stats.activeCodes} active codes`} />
+      </div>
+
+      {/* Charts Row 1: Revenue & Orders Volume */}
       <div data-tour="admin-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium text-gray-900">Revenue & Commissions</h2>
+          <h2 className="text-sm font-medium text-gray-900">Revenue & Order Volume</h2>
           <div className="flex gap-1 bg-gray-100 rounded p-0.5">
             <button onClick={() => setChartView('weekly')} className={`px-3 py-1 text-xs rounded ${chartView === 'weekly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Weekly</button>
             <button onClick={() => setChartView('monthly')} className={`px-3 py-1 text-xs rounded ${chartView === 'monthly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Monthly</button>
@@ -206,26 +178,29 @@ function OverviewTab() {
         {chartData.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-              <p className="text-xs text-gray-500 mb-2">Revenue</p>
+              <p className="text-xs text-gray-500 mb-2">Total Revenue</p>
               <ResponsiveContainer width="100%" height={240}>
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
                   <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
-                  <Area type="monotone" dataKey="revenue" stroke="#111827" fill="#f3f4f6" strokeWidth={2} />
+                  <Area type="monotone" dataKey="totalRevenue" stroke="#111827" fill="#f3f4f6" strokeWidth={2} name="Total Revenue" />
+                  <Area type="monotone" dataKey="attributedRevenue" stroke="#16a34a" fill="#dcfce7" strokeWidth={1.5} name="Attributed" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-2">Commissions Owed</p>
+              <p className="text-xs text-gray-500 mb-2">Order Volume</p>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
-                  <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
-                  <Bar dataKey="commissions" fill="#16a34a" radius={[3, 3, 0, 0]} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="attributedOrders" fill="#111827" stackId="orders" radius={[0, 0, 0, 0]} name="Attributed" />
+                  <Bar dataKey="nonAttributedOrders" fill="#d1d5db" stackId="orders" radius={[3, 3, 0, 0]} name="Non-Attributed" />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -235,68 +210,80 @@ function OverviewTab() {
         )}
       </div>
 
-      {/* Bottom: Top Affiliates + Recent Non-Attributed */}
-      <div className={`grid ${!selectedAffiliate && recentNonAttributed.length > 0 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} gap-6`}>
-        {topAffiliates.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-lg">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-medium text-gray-900">Top Affiliates</h2>
-            </div>
-            <DataTable
-              columns={topColumns}
-              data={rankedAffiliates}
-              footer={
-                <tfoot>
-                  <tr className="bg-gray-50 border-t border-gray-200">
-                    <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={2}>Total</td>
-                    <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{topAffiliates.reduce((s, a) => s + a.orders, 0)}</td>
-                    <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.revenue, 0))}</td>
-                    <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.commissions, 0))}</td>
-                  </tr>
-                </tfoot>
-              }
-            />
-          </div>
-        )}
-
-        {/* Recent Non-Attributed Orders */}
-        {!selectedAffiliate && recentNonAttributed.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-lg">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-sm font-medium text-gray-900">Recent Non-Attributed Orders</h2>
-              <span className="text-xs text-gray-400">{stats.nonAttributedCount || 0} total</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-left">
-                    <th className="px-4 py-2 text-gray-500 font-medium">Date</th>
-                    <th className="px-4 py-2 text-gray-500 font-medium">Customer</th>
-                    <th className="px-4 py-2 text-gray-500 font-medium">Items</th>
-                    <th className="px-4 py-2 text-gray-500 font-medium text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentNonAttributed.map((o: any) => (
-                    <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{formatDateTime(o.createdAt)}</td>
-                      <td className="px-4 py-2.5 text-gray-900">{o.customerFirstName}</td>
-                      <td className="px-4 py-2.5 text-gray-600 truncate max-w-[200px]">{o.itemsSummary}</td>
-                      <td className="px-4 py-2.5 text-gray-900 text-right font-medium">{formatMoney(o.orderTotal)}</td>
-                    </tr>
+      {/* Charts Row 2: Commissions & Attribution Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h2 className="text-sm font-medium text-gray-900 mb-4">Commissions Over Time</h2>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
+                <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Commissions']} />
+                <Line type="monotone" dataKey="commissions" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-sm text-gray-400 text-center py-12">No data</div>
+          )}
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h2 className="text-sm font-medium text-gray-900 mb-4">Revenue Attribution</h2>
+          {pieData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                  {pieData.map((_entry, index) => (
+                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                   ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-gray-50 border-t border-gray-200">
-                    <td className="px-4 py-2.5 text-gray-900 font-semibold text-sm" colSpan={3}>Subtotal ({recentNonAttributed.length} shown)</td>
-                    <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{formatMoney(recentNonAttributed.reduce((s, o) => s + o.orderTotal, 0))}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        )}
+                </Pie>
+                <Tooltip formatter={(value: number) => formatMoney(value)} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-sm text-gray-400 text-center py-12">No revenue data</div>
+          )}
+        </div>
       </div>
+
+      {/* Recent Non-Attributed Orders */}
+      {recentNonAttributed.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-sm font-medium text-gray-900">Recent Non-Attributed Orders</h2>
+            <span className="text-xs text-gray-400">{stats.nonAttributedOrders} total</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left">
+                  <th className="px-4 py-2 text-gray-500 font-medium">Date</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium">Customer</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium">Items</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentNonAttributed.map((o: any) => (
+                  <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{formatDateTime(o.createdAt)}</td>
+                    <td className="px-4 py-2.5 text-gray-900">{o.customerFirstName}</td>
+                    <td className="px-4 py-2.5 text-gray-600 truncate max-w-[200px]">{o.itemsSummary}</td>
+                    <td className="px-4 py-2.5 text-gray-900 text-right font-medium">{formatMoney(o.orderTotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-gray-50 border-t border-gray-200">
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-sm" colSpan={3}>Subtotal ({recentNonAttributed.length} shown)</td>
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{formatMoney(recentNonAttributed.reduce((s, o) => s + o.orderTotal, 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -318,9 +305,21 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ name: '', email: '', password: '', defaultCommissionRate: '20' });
+  const [selectedAffiliate, setSelectedAffiliate] = useState<string>('');
+  const [perfStats, setPerfStats] = useState<any>(null);
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [topAffiliates, setTopAffiliates] = useState<any[]>([]);
+  const [chartView, setChartView] = useState<'weekly' | 'monthly'>('weekly');
 
-  useEffect(() => { loadAffiliates(); }, []);
+  useEffect(() => { loadAffiliates(); api.adminTopAffiliates().then(setTopAffiliates); }, []);
   async function loadAffiliates() { setAffiliates(await api.getAffiliates()); }
+
+  useEffect(() => {
+    const affId = selectedAffiliate || undefined;
+    Promise.all([api.adminStats(affId), api.adminWeekly(affId), api.adminMonthly(affId)])
+      .then(([s, w, m]) => { setPerfStats(s); setWeeklyData(w); setMonthlyData(m); });
+  }, [selectedAffiliate]);
 
   function openCreate() {
     setEditing(null);
@@ -374,8 +373,138 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
     },
   ];
 
+  const selectedName = selectedAffiliate ? affiliates.find((a) => a.id === selectedAffiliate)?.name || 'Affiliate' : 'All Affiliates';
+  const perfChartData = chartView === 'weekly' ? weeklyData : monthlyData;
+
+  const topColumns: Column[] = [
+    { key: '_rank', label: '#', defaultWidth: 50, sortable: false, render: (_r: any) => '' },
+    { key: 'name', label: 'Name', defaultWidth: 200, className: 'text-gray-900 font-medium' },
+    { key: 'orders', label: 'Orders', align: 'right', defaultWidth: 100, className: 'text-gray-600' },
+    { key: 'revenue', label: 'Revenue', align: 'right', defaultWidth: 130, render: (r: any) => formatMoney(r.revenue), className: 'text-gray-900' },
+    { key: 'commissions', label: 'Commissions', align: 'right', defaultWidth: 130, render: (r: any) => <span className="text-green-700 font-medium">{formatMoney(r.commissions)}</span> },
+  ];
+  const rankedAffiliates = topAffiliates.map((a, i) => ({ ...a, _rank: i + 1 }));
+
   return (
     <div>
+      {/* Affiliate Performance Overview */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div data-tour="admin-filter" className="flex items-center gap-3">
+            <label className="text-sm text-gray-500">Filter by affiliate:</label>
+            <select value={selectedAffiliate} onChange={(e) => setSelectedAffiliate(e.target.value)}
+              className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[200px]">
+              <option value="">All Affiliates</option>
+              {affiliates.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            {selectedAffiliate && <button onClick={() => setSelectedAffiliate('')} className="text-xs text-gray-500 hover:text-gray-900">Clear</button>}
+          </div>
+        </div>
+
+        {selectedAffiliate && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 mb-4 text-sm text-blue-800">
+            Showing data for <span className="font-semibold">{selectedName}</span>
+          </div>
+        )}
+
+        {perfStats && (
+          <>
+            <div className="mb-2">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                {selectedAffiliate ? `${selectedName}'s Performance` : 'Affiliate Performance'}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <StatCard
+                label={selectedAffiliate ? 'Their Orders' : 'Attributed Orders'}
+                value={perfStats.attributedOrders}
+                sub={selectedAffiliate ? `${perfStats.totalOrders} total` : `${perfStats.totalOrders - perfStats.attributedOrders} without code`}
+              />
+              <StatCard
+                label={selectedAffiliate ? 'Their Revenue' : 'Affiliate Revenue'}
+                value={formatMoney(perfStats.totalRevenue)}
+                sub="From attributed orders"
+              />
+              <StatCard
+                label={selectedAffiliate ? 'Their Commissions' : 'Commissions Owed'}
+                value={formatMoney(perfStats.totalCommissions)}
+                sub={`${formatMoney(perfStats.pendingPayouts)} pending payout`}
+              />
+              {selectedAffiliate ? (
+                <StatCard label="Pending Payout" value={formatMoney(perfStats.pendingPayouts)} sub="Awaiting payment" />
+              ) : (
+                <StatCard label="Net Revenue" value={formatMoney((perfStats.totalRevenue || 0) - (perfStats.totalCommissions || 0))} sub="Revenue minus commissions" />
+              )}
+            </div>
+
+            {/* Charts */}
+            <div data-tour="admin-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-medium text-gray-900">Revenue & Commissions</h2>
+                <div className="flex gap-1 bg-gray-100 rounded p-0.5">
+                  <button onClick={() => setChartView('weekly')} className={`px-3 py-1 text-xs rounded ${chartView === 'weekly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Weekly</button>
+                  <button onClick={() => setChartView('monthly')} className={`px-3 py-1 text-xs rounded ${chartView === 'monthly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Monthly</button>
+                </div>
+              </div>
+              {perfChartData.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-2">Revenue</p>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <AreaChart data={perfChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
+                        <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
+                        <Area type="monotone" dataKey="revenue" stroke="#111827" fill="#f3f4f6" strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-2">Commissions Owed</p>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={perfChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
+                        <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
+                        <Bar dataKey="commissions" fill="#16a34a" radius={[3, 3, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-400 text-center py-8">No chart data available</div>
+              )}
+            </div>
+
+            {/* Top Affiliates */}
+            {!selectedAffiliate && topAffiliates.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-lg mb-6">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <h2 className="text-sm font-medium text-gray-900">Top Affiliates</h2>
+                </div>
+                <DataTable
+                  columns={topColumns}
+                  data={rankedAffiliates}
+                  footer={
+                    <tfoot>
+                      <tr className="bg-gray-50 border-t border-gray-200">
+                        <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={2}>Total</td>
+                        <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{topAffiliates.reduce((s, a) => s + a.orders, 0)}</td>
+                        <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.revenue, 0))}</td>
+                        <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.commissions, 0))}</td>
+                      </tr>
+                    </tfoot>
+                  }
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Affiliates CRUD Table */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-sm font-medium text-gray-900">{affiliates.length} Affiliates</h2>
         <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Affiliate</button>
