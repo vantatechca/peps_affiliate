@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
 import { downloadAffiliateReport } from '../pdfReport';
+import DataTable, { Column } from '../components/DataTable';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
 } from 'recharts';
@@ -27,6 +28,7 @@ interface Order {
 
 function formatMoney(n: number) { return `$${n.toFixed(2)}`; }
 function formatDate(d: string) { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+function formatDateTime(d: string) { return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); }
 
 function codeStatus(code: { active: boolean; expiresAt: string | null }) {
   if (!code.active) return { label: 'Inactive', color: 'text-gray-400' };
@@ -203,44 +205,26 @@ export default function AffiliateDashboard() {
             <div className="px-4 py-3 border-b border-gray-100">
               <h2 className="text-sm font-medium text-gray-900">Your Discount Codes</h2>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-left text-gray-500">
-                    <th className="px-4 py-2 font-medium">Code</th>
-                    <th className="px-4 py-2 font-medium">Label</th>
-                    <th className="px-4 py-2 font-medium">Discount</th>
-                    <th className="px-4 py-2 font-medium">Times Used</th>
-                    <th className="px-4 py-2 font-medium">Expires</th>
-                    <th className="px-4 py-2 font-medium">Status</th>
+            <DataTable
+              columns={[
+                { key: 'code', label: 'Code', defaultWidth: 150, className: 'font-mono font-medium text-gray-900' },
+                { key: 'label', label: 'Label', defaultWidth: 150, render: (r: any) => r.label || '—', className: 'text-gray-600' },
+                { key: 'discountPercent', label: 'Discount', defaultWidth: 100, render: (r: any) => `${(r.discountPercent * 100).toFixed(0)}%`, className: 'text-gray-600' },
+                { key: 'timesUsed', label: 'Times Used', defaultWidth: 110, className: 'text-gray-900 font-medium' },
+                { key: 'expiresAt', label: 'Expires', defaultWidth: 140, render: (r: any) => r.expiresAt ? formatDate(r.expiresAt) : 'Never', className: 'text-gray-600' },
+                { key: 'active', label: 'Status', defaultWidth: 100, render: (r: any) => { const s = codeStatus(r); return <span className={`font-medium ${s.color}`}>{s.label}</span>; } },
+              ]}
+              data={data.codes}
+              footer={data.codes.length > 0 ? (
+                <tfoot>
+                  <tr className="bg-gray-50 border-t border-gray-200">
+                    <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={3}>Total ({data.codes.length} codes)</td>
+                    <td className="px-4 py-3 text-gray-900 font-semibold text-sm">{data.codes.reduce((s, c) => s + c.timesUsed, 0)}</td>
+                    <td className="px-4 py-3" colSpan={2}></td>
                   </tr>
-                </thead>
-                <tbody>
-                  {data.codes.map((c) => {
-                    const status = codeStatus(c);
-                    return (
-                      <tr key={c.id} className="border-b border-gray-50">
-                        <td className="px-4 py-3 font-mono font-medium text-gray-900">{c.code}</td>
-                        <td className="px-4 py-3 text-gray-600">{c.label || '—'}</td>
-                        <td className="px-4 py-3 text-gray-600">{(c.discountPercent * 100).toFixed(0)}%</td>
-                        <td className="px-4 py-3 text-gray-900 font-medium">{c.timesUsed}</td>
-                        <td className="px-4 py-3 text-gray-600">{c.expiresAt ? formatDate(c.expiresAt) : 'Never'}</td>
-                        <td className={`px-4 py-3 font-medium ${status.color}`}>{status.label}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                {data.codes.length > 0 && (
-                  <tfoot>
-                    <tr className="bg-gray-50 border-t border-gray-200">
-                      <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={3}>Total ({data.codes.length} codes)</td>
-                      <td className="px-4 py-3 text-gray-900 font-semibold text-sm">{data.codes.reduce((s, c) => s + c.timesUsed, 0)}</td>
-                      <td className="px-4 py-3" colSpan={2}></td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
+                </tfoot>
+              ) : undefined}
+            />
           </div>
         )}
       </div>
@@ -259,42 +243,29 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub: st
 }
 
 function OrdersTable({ orders }: { orders: Order[] }) {
-  if (orders.length === 0) return <div className="px-4 py-8 text-sm text-gray-400 text-center">No orders found</div>;
+  const columns: Column[] = [
+    { key: 'date', label: 'Date & Time', defaultWidth: 180, render: (r: any) => <span className="text-gray-500 text-xs">{formatDateTime(r.date)}</span> },
+    { key: 'customerFirstName', label: 'Customer', defaultWidth: 120, className: 'text-gray-900' },
+    { key: 'itemsSummary', label: 'Items', defaultWidth: 250, className: 'text-gray-600' },
+    { key: 'discountCode', label: 'Code', defaultWidth: 120, render: (r: any) => <span className="font-mono text-xs text-gray-500">{r.discountCode}</span> },
+    { key: 'orderTotal', label: 'Order Total', align: 'right', defaultWidth: 120, render: (r: any) => formatMoney(r.orderTotal), className: 'text-gray-900' },
+    { key: 'commissionEarned', label: 'Your Earning', align: 'right', defaultWidth: 120, render: (r: any) => <span className="text-green-700 font-medium">{formatMoney(r.commissionEarned)}</span> },
+  ];
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 text-left text-gray-500">
-            <th className="px-4 py-2 font-medium">Date</th>
-            <th className="px-4 py-2 font-medium">Customer</th>
-            <th className="px-4 py-2 font-medium">Items</th>
-            <th className="px-4 py-2 font-medium">Code</th>
-            <th className="px-4 py-2 font-medium text-right">Order Total</th>
-            <th className="px-4 py-2 font-medium text-right">Your Earning</th>
+    <DataTable
+      columns={columns}
+      data={orders}
+      emptyMessage="No orders found"
+      footer={orders.length > 0 ? (
+        <tfoot>
+          <tr className="bg-gray-50 border-t border-gray-200">
+            <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={4}>Total ({orders.length} orders)</td>
+            <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(orders.reduce((s, o) => s + o.orderTotal, 0))}</td>
+            <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(orders.reduce((s, o) => s + o.commissionEarned, 0))}</td>
           </tr>
-        </thead>
-        <tbody>
-          {orders.map((o) => (
-            <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50">
-              <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(o.date)}</td>
-              <td className="px-4 py-3 text-gray-900">{o.customerFirstName}</td>
-              <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{o.itemsSummary}</td>
-              <td className="px-4 py-3 font-mono text-xs text-gray-500">{o.discountCode}</td>
-              <td className="px-4 py-3 text-gray-900 text-right">{formatMoney(o.orderTotal)}</td>
-              <td className="px-4 py-3 text-green-700 font-medium text-right">{formatMoney(o.commissionEarned)}</td>
-            </tr>
-          ))}
-        </tbody>
-        {orders.length > 0 && (
-          <tfoot>
-            <tr className="bg-gray-50 border-t border-gray-200">
-              <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={4}>Total ({orders.length} orders)</td>
-              <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(orders.reduce((s, o) => s + o.orderTotal, 0))}</td>
-              <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(orders.reduce((s, o) => s + o.commissionEarned, 0))}</td>
-            </tr>
-          </tfoot>
-        )}
-      </table>
-    </div>
+        </tfoot>
+      ) : undefined}
+    />
   );
 }

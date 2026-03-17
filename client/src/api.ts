@@ -62,6 +62,8 @@ export const api = {
     const qs = new URLSearchParams(params || {}).toString();
     return request(`/admin/orders?${qs}`);
   },
+  deleteOrder: (id: string) =>
+    request(`/admin/orders/${id}`, { method: 'DELETE' }),
 
   getPayouts: () => request('/admin/payouts'),
   createPayout: (data: any) =>

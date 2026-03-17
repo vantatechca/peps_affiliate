@@ -243,6 +243,17 @@ router.get('/orders', async (req: Request, res: Response) => {
   }
 });
 
+// DELETE /api/admin/orders/:id
+router.delete('/orders/:id', async (req: Request, res: Response) => {
+  try {
+    await prisma.order.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete order error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ============ PAYOUTS ============
 
 // GET /api/admin/payouts
