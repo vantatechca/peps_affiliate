@@ -33,7 +33,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (req.user?.role !== 'ADMIN') {
+  if (req.user?.role !== 'ADMIN' && req.user?.role !== 'SUPER_ADMIN') {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();
