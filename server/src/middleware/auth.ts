@@ -32,9 +32,18 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+// Allows ADMIN and SUPER_ADMIN
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.user?.role !== 'ADMIN' && req.user?.role !== 'SUPER_ADMIN') {
     return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
+// Only SUPER_ADMIN
+export function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ error: 'Super admin access required' });
   }
   next();
 }

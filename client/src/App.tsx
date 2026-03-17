@@ -9,6 +9,10 @@ function getDefaultRoute(role: string) {
   return '/dashboard';
 }
 
+function isAdminRole(role: string) {
+  return role === 'ADMIN' || role === 'SUPER_ADMIN';
+}
+
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) {
   const { user, loading } = useAuth();
 

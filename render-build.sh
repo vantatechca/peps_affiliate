@@ -14,5 +14,5 @@ cd server
 npm install --include=dev
 chmod -R +x node_modules/.bin
 npx prisma generate
-npx prisma db push --accept-data-loss
+npx prisma db push
 npx tsc

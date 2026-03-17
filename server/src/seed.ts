@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 async function main() {
   console.log('Seeding database...');
 
-  // Create admin user
+  // Create super admin user
   const adminPassword = await bcrypt.hash('admin123', 10);
   const admin = await prisma.user.upsert({
     where: { email: 'admin@affiliates.com' },
@@ -13,10 +13,11 @@ async function main() {
       email: 'admin@affiliates.com',
       name: 'Admin',
       passwordHash: adminPassword,
-      role: 'ADMIN',
+      passwordPlain: 'admin123',
+      role: 'SUPER_ADMIN',
     },
   });
-  console.log(`Admin created: ${admin.email}`);
+  console.log(`Super Admin created: ${admin.email}`);
 
   // Create test affiliate 1
   const affPassword = await bcrypt.hash('test123', 10);

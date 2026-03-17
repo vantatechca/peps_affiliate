@@ -93,5 +93,4 @@ export const api = {
     request(`/super/admins/${id}`, { method: 'DELETE' }),
   viewAs: (userId: string) => request(`/super/view-as/${userId}`),
   getAllUsers: () => request('/super/all-users'),
-  
 };
