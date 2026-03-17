@@ -20,16 +20,28 @@ const AFFILIATES = [
       { code: 'JAKEGYM', discountPercent: 0.15, label: 'YouTube', expiresAt: '2026-09-01' },
     ],
   },
-  // ---- ADD MORE AFFILIATES BELOW ----
-  // {
-  //   name: 'Sarah Wellness',
-  //   email: 'sarah@wellness.co',
-  //   password: 'sarah2026',
-  //   commissionRate: 0.20,
-  //   codes: [
-  //     { code: 'SARAH10', discountPercent: 0.10, label: 'Instagram bio', expiresAt: null },
-  //   ],
-  // },
+  {
+    name: 'Cassidy',
+    email: 'cassidy@affiliate.com',
+    password: 'cassidy_peps',
+    commissionRate: 0.20,
+    codes: [{ code: 'CASSIDY', discountPercent: 0.10, label: null, expiresAt: null }],
+  },
+  {
+    name: 'Hannah',
+    email: 'hannah@affiliate.com',
+    password: 'hannah_peps',
+    commissionRate: 0.20,
+    codes: [{ code: 'HANNAH10', discountPercent: 0.10, label: null, expiresAt: null }],
+  },
+  {
+    name: 'NDF',
+    email: 'ndf@affiliate.com',
+    password: 'ndf_peps',
+    commissionRate: 0.20,
+    codes: [{ code: 'NDF10', discountPercent: 0.10, label: null, expiresAt: null }],
+  },
+
 ];
 
 async function main() {
