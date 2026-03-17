@@ -10,16 +10,7 @@ import bcrypt from 'bcryptjs';
 
 const AFFILIATES = [
   // ---- COPY THIS BLOCK FOR EACH AFFILIATE ----
-  {
-    name: 'Jake Fitness',
-    email: 'jake@fitness.com',
-    password: 'jake2026',
-    commissionRate: 0.20,       // 20%
-    codes: [
-      { code: 'JAKE10', discountPercent: 0.10, label: 'TikTok main', expiresAt: '2026-12-31' },
-      { code: 'JAKEGYM', discountPercent: 0.15, label: 'YouTube', expiresAt: '2026-09-01' },
-    ],
-  },
+  
   {
     name: 'Cassidy',
     email: 'cassidy@affiliate.com',
