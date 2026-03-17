@@ -76,7 +76,11 @@ function OverviewTab() {
     setOrders(o.orders);
   }
 
-  function handleDownloadPDF() { if (stats) downloadAdminReport(stats, affiliates, orders); }
+  function handleDownloadPDF() {
+    if (!stats) return;
+    const filteredOrders = selectedAffiliate ? orders.filter((o: any) => o.attributed) : orders;
+    downloadAdminReport(stats, affiliates, filteredOrders, selectedAffiliate ? selectedName : undefined);
+  }
 
   const selectedName = selectedAffiliate ? affiliates.find((a) => a.id === selectedAffiliate)?.name || 'Affiliate' : 'All Affiliates';
   if (!stats) return <div className="text-gray-500 text-sm">Loading...</div>;
@@ -442,9 +446,17 @@ function CodesTab() {
 function OrdersTab() {
   const [data, setData] = useState<{ orders: any[]; total: number }>({ orders: [], total: 0 });
   const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<'all' | 'yes' | 'no'>('all');
 
-  useEffect(() => { loadOrders(); }, [page]);
-  function loadOrders() { api.getOrders({ page: page.toString(), limit: '50' }).then(setData); }
+  useEffect(() => { setPage(1); }, [filter]);
+  useEffect(() => { loadOrders(); }, [page, filter]);
+
+  function loadOrders() {
+    const params: any = { page: page.toString(), limit: '50' };
+    if (filter === 'yes') params.attributed = 'true';
+    if (filter === 'no') params.attributed = 'false';
+    api.getOrders(params).then(setData);
+  }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this order? This cannot be undone.')) return;
@@ -470,7 +482,20 @@ function OrdersTab() {
 
   return (
     <div>
-      <h2 className="text-sm font-medium text-gray-900 mb-4">All Orders ({data.total})</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-medium text-gray-900">All Orders ({data.total})</h2>
+        <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1">
+          {([['all', 'All'], ['yes', 'Attributed'], ['no', 'Not Attributed']] as const).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setFilter(val)}
+              className={`px-3 py-1 text-xs rounded-md ${filter === val ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <DataTable
           columns={columns}

@@ -154,44 +154,66 @@ export function downloadAdminReport(
   stats: any,
   affiliates: any[],
   orders: any[],
+  affiliateName?: string,
 ) {
-  const doc = generatePDF({
-    title: 'Admin Sales Report',
-    subtitle: 'All Affiliates Overview',
-    stats: [
-      { label: 'Total Affiliates', value: `${stats.totalAffiliates} (${stats.activeAffiliates} active)` },
-      { label: 'Attributed Orders', value: stats.attributedOrders.toString() },
-      { label: 'Total Revenue', value: formatMoney(stats.totalRevenue) },
-      { label: 'Total Commissions', value: formatMoney(stats.totalCommissions) },
-      { label: 'Pending Payouts', value: formatMoney(stats.pendingPayouts) },
-    ],
-    tables: [
-      {
-        title: 'Affiliates',
-        headers: ['Name', 'Email', 'Commission', 'Codes', 'Status'],
-        rows: affiliates.map((a: any) => [
-          a.name,
-          a.email,
-          `${(a.defaultCommissionRate * 100).toFixed(0)}%`,
-          (a.discountCodes?.length || 0).toString(),
-          a.active ? 'Active' : 'Inactive',
-        ]),
-      },
-      {
-        title: 'Recent Orders',
-        headers: ['Date', 'Customer', 'Items', 'Code', 'Affiliate', 'Total', 'Commission'],
-        rows: orders.slice(0, 100).map((o: any) => [
-          formatDate(o.createdAt),
-          o.customerFirstName,
-          o.itemsSummary,
-          o.discountCode?.code || '—',
-          o.discountCode?.affiliate?.name || '—',
-          formatMoney(o.orderTotal),
-          formatMoney(o.commissionEarned),
-        ]),
-      },
-    ],
+  const isFiltered = !!affiliateName;
+
+  const statsList = isFiltered
+    ? [
+        { label: 'Affiliate', value: affiliateName! },
+        { label: 'Attributed Orders', value: stats.attributedOrders.toString() },
+        { label: 'Revenue', value: formatMoney(stats.totalRevenue) },
+        { label: 'Commissions', value: formatMoney(stats.totalCommissions) },
+        { label: 'Pending Payouts', value: formatMoney(stats.pendingPayouts) },
+      ]
+    : [
+        { label: 'Total Affiliates', value: `${stats.totalAffiliates} (${stats.activeAffiliates} active)` },
+        { label: 'Attributed Orders', value: stats.attributedOrders.toString() },
+        { label: 'Total Revenue', value: formatMoney(stats.totalRevenue) },
+        { label: 'Total Commissions', value: formatMoney(stats.totalCommissions) },
+        { label: 'Pending Payouts', value: formatMoney(stats.pendingPayouts) },
+      ];
+
+  const tables: Array<{ title: string; headers: string[]; rows: string[][] }> = [];
+
+  if (!isFiltered) {
+    tables.push({
+      title: 'Affiliates',
+      headers: ['Name', 'Email', 'Commission', 'Codes', 'Status'],
+      rows: affiliates.map((a: any) => [
+        a.name,
+        a.email,
+        `${(a.defaultCommissionRate * 100).toFixed(0)}%`,
+        (a.discountCodes?.length || 0).toString(),
+        a.active ? 'Active' : 'Inactive',
+      ]),
+    });
+  }
+
+  tables.push({
+    title: isFiltered ? `Orders — ${affiliateName}` : 'Recent Orders',
+    headers: ['Date', 'Customer', 'Items', 'Code', 'Affiliate', 'Total', 'Commission'],
+    rows: orders.slice(0, 100).map((o: any) => [
+      formatDate(o.createdAt),
+      o.customerFirstName,
+      o.itemsSummary,
+      o.discountCode?.code || '—',
+      o.discountCode?.affiliate?.name || '—',
+      formatMoney(o.orderTotal),
+      formatMoney(o.commissionEarned),
+    ]),
   });
 
-  doc.save(`admin-report-${new Date().toISOString().split('T')[0]}.pdf`);
+  const doc = generatePDF({
+    title: isFiltered ? `Affiliate Report — ${affiliateName}` : 'Admin Sales Report',
+    subtitle: isFiltered ? 'Individual Affiliate Performance' : 'All Affiliates Overview',
+    stats: statsList,
+    tables,
+  });
+
+  const filename = isFiltered
+    ? `affiliate-report-${affiliateName!.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`
+    : `admin-report-${new Date().toISOString().split('T')[0]}.pdf`;
+
+  doc.save(filename);
 }
