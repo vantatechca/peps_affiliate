@@ -348,18 +348,23 @@ router.get('/stats', async (req: Request, res: Response) => {
       payoutWhere.affiliateId = affiliateId as string;
     }
 
-    const [totalAffiliates, activeAffiliates, totalOrders, attributedOrders, totalRevenue, totalCommissions, pendingPayouts] =
-      await Promise.all([
-        prisma.user.count({ where: { role: 'AFFILIATE' } }),
-        prisma.user.count({ where: { role: 'AFFILIATE', active: true } }),
-        affiliateId
-          ? prisma.order.count({ where: { discountCodeId: { in: (orderWhere.discountCodeId as any).in } } })
-          : prisma.order.count(),
-        prisma.order.count({ where: orderWhere }),
-        prisma.order.aggregate({ _sum: { orderTotal: true }, where: orderWhere }),
-        prisma.order.aggregate({ _sum: { commissionEarned: true }, where: orderWhere }),
-        prisma.payout.aggregate({ _sum: { amount: true }, where: payoutWhere }),
-      ]);
+    const [
+      totalAffiliates, activeAffiliates, totalOrders, attributedOrders,
+      totalRevenue, totalCommissions, pendingPayouts,
+      allOrdersRevenue, nonAttributedCount,
+    ] = await Promise.all([
+      prisma.user.count({ where: { role: 'AFFILIATE' } }),
+      prisma.user.count({ where: { role: 'AFFILIATE', active: true } }),
+      affiliateId
+        ? prisma.order.count({ where: { discountCodeId: { in: (orderWhere.discountCodeId as any).in } } })
+        : prisma.order.count(),
+      prisma.order.count({ where: orderWhere }),
+      prisma.order.aggregate({ _sum: { orderTotal: true }, where: orderWhere }),
+      prisma.order.aggregate({ _sum: { commissionEarned: true }, where: orderWhere }),
+      prisma.payout.aggregate({ _sum: { amount: true }, where: payoutWhere }),
+      prisma.order.aggregate({ _sum: { orderTotal: true } }),
+      prisma.order.count({ where: { attributed: false } }),
+    ]);
 
     res.json({
       totalAffiliates,
@@ -369,6 +374,8 @@ router.get('/stats', async (req: Request, res: Response) => {
       totalRevenue: totalRevenue._sum.orderTotal || 0,
       totalCommissions: totalCommissions._sum.commissionEarned || 0,
       pendingPayouts: pendingPayouts._sum.amount || 0,
+      allOrdersRevenue: allOrdersRevenue._sum.orderTotal || 0,
+      nonAttributedCount,
     });
   } catch (error) {
     console.error('Get stats error:', error);

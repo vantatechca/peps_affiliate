@@ -84,11 +84,14 @@ function OverviewTab() {
   const [chartView, setChartView] = useState<'weekly' | 'monthly'>('weekly');
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [recentNonAttributed, setRecentNonAttributed] = useState<any[]>([]);
   const [selectedAffiliate, setSelectedAffiliate] = useState<string>('');
 
   useEffect(() => {
     api.getAffiliates().then(setAffiliates);
     api.adminTopAffiliates().then(setTopAffiliates);
+    // Load recent non-attributed orders
+    api.getOrders({ limit: '10', attributed: 'false' }).then((d) => setRecentNonAttributed(d.orders));
   }, []);
 
   useEffect(() => { loadFilteredData(); }, [selectedAffiliate]);
@@ -112,6 +115,7 @@ function OverviewTab() {
   const selectedName = selectedAffiliate ? affiliates.find((a) => a.id === selectedAffiliate)?.name || 'Affiliate' : 'All Affiliates';
   if (!stats) return <div className="text-gray-500 text-sm">Loading...</div>;
   const chartData = chartView === 'weekly' ? weeklyData : monthlyData;
+  const conversionRate = stats.totalOrders > 0 ? ((stats.attributedOrders / stats.totalOrders) * 100).toFixed(1) : '0';
 
   const topColumns: Column[] = [
     { key: '_rank', label: '#', defaultWidth: 50, sortable: false, render: (_r: any) => '' },
@@ -144,14 +148,52 @@ function OverviewTab() {
         </div>
       )}
 
-      <div data-tour="admin-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {!selectedAffiliate && <StatCard label="Total Affiliates" value={stats.totalAffiliates} sub={`${stats.activeAffiliates} active`} />}
-        <StatCard label={selectedAffiliate ? 'Their Orders' : 'Total Orders'} value={stats.attributedOrders} sub={`${stats.totalOrders} total (inc. unattributed)`} />
-        <StatCard label={selectedAffiliate ? 'Their Revenue' : 'Affiliate Revenue'} value={formatMoney(stats.totalRevenue)} sub="From attributed orders" />
-        <StatCard label={selectedAffiliate ? 'Their Commissions' : 'Total Commissions'} value={formatMoney(stats.totalCommissions)} sub={`${formatMoney(stats.pendingPayouts)} pending`} />
-        {selectedAffiliate && <StatCard label="Pending Payout" value={formatMoney(stats.pendingPayouts)} sub="Awaiting payment" />}
+      {/* Business Overview — all orders */}
+      {!selectedAffiliate && (
+        <>
+          <div className="mb-2">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Business Overview</p>
+          </div>
+          <div data-tour="admin-stats" className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <StatCard label="All Orders" value={stats.totalOrders} sub="Total orders received" />
+            <StatCard label="Total Revenue" value={formatMoney(stats.allOrdersRevenue || 0)} sub="From all orders" />
+            <StatCard label="Non-Attributed" value={stats.nonAttributedCount || 0} sub="No affiliate code used" />
+            <StatCard label="Affiliate Conversion" value={`${conversionRate}%`} sub={`${stats.attributedOrders} of ${stats.totalOrders} orders`} />
+            <StatCard label="Total Affiliates" value={stats.totalAffiliates} sub={`${stats.activeAffiliates} active`} />
+          </div>
+        </>
+      )}
+
+      {/* Affiliate Performance */}
+      <div className="mb-2">
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+          {selectedAffiliate ? `${selectedName}'s Performance` : 'Affiliate Performance'}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard
+          label={selectedAffiliate ? 'Their Orders' : 'Attributed Orders'}
+          value={stats.attributedOrders}
+          sub={selectedAffiliate ? `${stats.totalOrders} total` : `${stats.totalOrders - stats.attributedOrders} without code`}
+        />
+        <StatCard
+          label={selectedAffiliate ? 'Their Revenue' : 'Affiliate Revenue'}
+          value={formatMoney(stats.totalRevenue)}
+          sub="From attributed orders"
+        />
+        <StatCard
+          label={selectedAffiliate ? 'Their Commissions' : 'Commissions Owed'}
+          value={formatMoney(stats.totalCommissions)}
+          sub={`${formatMoney(stats.pendingPayouts)} pending payout`}
+        />
+        {selectedAffiliate ? (
+          <StatCard label="Pending Payout" value={formatMoney(stats.pendingPayouts)} sub="Awaiting payment" />
+        ) : (
+          <StatCard label="Net Revenue" value={formatMoney((stats.totalRevenue || 0) - (stats.totalCommissions || 0))} sub="Revenue minus commissions" />
+        )}
       </div>
 
+      {/* Charts */}
       <div data-tour="admin-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-medium text-gray-900">Revenue & Commissions</h2>
@@ -192,27 +234,68 @@ function OverviewTab() {
         )}
       </div>
 
-      {topAffiliates.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="text-sm font-medium text-gray-900">Top Affiliates</h2>
+      {/* Bottom: Top Affiliates + Recent Non-Attributed */}
+      <div className={`grid ${!selectedAffiliate && recentNonAttributed.length > 0 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} gap-6`}>
+        {topAffiliates.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-lg">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h2 className="text-sm font-medium text-gray-900">Top Affiliates</h2>
+            </div>
+            <DataTable
+              columns={topColumns}
+              data={rankedAffiliates}
+              footer={
+                <tfoot>
+                  <tr className="bg-gray-50 border-t border-gray-200">
+                    <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={2}>Total</td>
+                    <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{topAffiliates.reduce((s, a) => s + a.orders, 0)}</td>
+                    <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.revenue, 0))}</td>
+                    <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.commissions, 0))}</td>
+                  </tr>
+                </tfoot>
+              }
+            />
           </div>
-          <DataTable
-            columns={topColumns}
-            data={rankedAffiliates}
-            footer={
-              <tfoot>
-                <tr className="bg-gray-50 border-t border-gray-200">
-                  <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={2}>Total</td>
-                  <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{topAffiliates.reduce((s, a) => s + a.orders, 0)}</td>
-                  <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.revenue, 0))}</td>
-                  <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.commissions, 0))}</td>
-                </tr>
-              </tfoot>
-            }
-          />
-        </div>
-      )}
+        )}
+
+        {/* Recent Non-Attributed Orders */}
+        {!selectedAffiliate && recentNonAttributed.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-lg">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-sm font-medium text-gray-900">Recent Non-Attributed Orders</h2>
+              <span className="text-xs text-gray-400">{stats.nonAttributedCount || 0} total</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left">
+                    <th className="px-4 py-2 text-gray-500 font-medium">Date</th>
+                    <th className="px-4 py-2 text-gray-500 font-medium">Customer</th>
+                    <th className="px-4 py-2 text-gray-500 font-medium">Items</th>
+                    <th className="px-4 py-2 text-gray-500 font-medium text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentNonAttributed.map((o: any) => (
+                    <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{formatDateTime(o.createdAt)}</td>
+                      <td className="px-4 py-2.5 text-gray-900">{o.customerFirstName}</td>
+                      <td className="px-4 py-2.5 text-gray-600 truncate max-w-[200px]">{o.itemsSummary}</td>
+                      <td className="px-4 py-2.5 text-gray-900 text-right font-medium">{formatMoney(o.orderTotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-50 border-t border-gray-200">
+                    <td className="px-4 py-2.5 text-gray-900 font-semibold text-sm" colSpan={3}>Subtotal ({recentNonAttributed.length} shown)</td>
+                    <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{formatMoney(recentNonAttributed.reduce((s, o) => s + o.orderTotal, 0))}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

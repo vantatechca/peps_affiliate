@@ -14,7 +14,6 @@ const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
 app.use(express.json());
-app.use('/api/super', superRoutes);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -22,6 +21,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/affiliate', affiliateRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/charts', chartRoutes);
+app.use('/api/super', superRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
