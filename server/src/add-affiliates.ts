@@ -93,7 +93,7 @@ async function main() {
           code: codeStr,
           affiliateId: user.id,
           discountPercent: c.discountPercent ?? 0.10,
-          commissionRateOverride: c.commissionOverride ?? null,
+          commissionRateOverride: (c as any).commissionOverride ?? null,
           label: c.label || null,
           expiresAt: c.expiresAt ? new Date(c.expiresAt) : null,
         },
