@@ -18,12 +18,45 @@ function formatDateTime(d: string) { return new Date(d).toLocaleString('en-US', 
 function formatPct(n: number) { return `${(n * 100).toFixed(0)}%`; }
 
 const ADMIN_TUTORIAL_STEPS: TutorialStep[] = [
-  { target: '[data-tour="admin-tabs"]', title: 'Navigation Tabs', content: 'Switch between Overview, Affiliates, Codes, Orders, and Payouts to manage your affiliate program.', position: 'bottom' },
-  { target: '[data-tour="admin-stats"]', title: 'Dashboard Overview', content: 'See your total affiliates, orders, revenue, and commissions at a glance. Use the filter to view a specific affiliate\'s performance.', position: 'bottom' },
-  { target: '[data-tour="admin-charts"]', title: 'Revenue Charts', content: 'Toggle between weekly and monthly views to track revenue and commissions over time.', position: 'top' },
-  { target: '[data-tour="admin-filter"]', title: 'Affiliate Filter', content: 'Select an affiliate from the dropdown to view their individual performance, charts, and orders.', position: 'bottom' },
-  { target: '[data-tour="admin-pdf"]', title: 'Download Reports', content: 'Export a PDF report of all affiliate data, including orders and commissions.', position: 'bottom' },
+  // Global steps (shown on every tab)
+  { target: '[data-tour="admin-tabs"]', title: 'Navigation Tabs', content: 'Switch between Business Overview, Affiliates, Codes, Orders, Payouts, and more to manage your affiliate program.', position: 'bottom' },
   { target: '[data-tour="theme-toggle"]', title: 'Dark Mode', content: 'Toggle between light and dark mode for your preferred viewing experience.', position: 'left' },
+
+  // Business Overview tab
+  { tab: 'business', target: '[data-tour="biz-source-filter"]', title: 'Source Filter', content: 'Filter all metrics by order source — Shopify, WordPress, or view everything combined.', position: 'bottom' },
+  { tab: 'business', target: '[data-tour="biz-stats"]', title: 'Key Metrics', content: 'See total revenue, today\'s and this month\'s performance, net revenue after commissions, and more at a glance.', position: 'bottom' },
+  { tab: 'business', target: '[data-tour="biz-attribution"]', title: 'Attribution & Affiliates', content: 'Track conversion rate, non-attributed orders, commissions owed, and active affiliates in your program.', position: 'bottom' },
+  { tab: 'business', target: '[data-tour="biz-charts"]', title: 'Revenue & Order Volume', content: 'Visualize revenue trends and order volume over time. Toggle between weekly and monthly views.', position: 'top' },
+  { tab: 'business', target: '[data-tour="biz-secondary-charts"]', title: 'Commissions & Attribution', content: 'Track commission payouts over time and see how revenue splits between attributed and non-attributed orders.', position: 'top' },
+  { tab: 'business', target: '[data-tour="admin-pdf"]', title: 'Download Report', content: 'Export a comprehensive PDF report of all business data including orders, affiliates, and revenue.', position: 'bottom' },
+
+  // Affiliates tab
+  { tab: 'affiliates', target: '[data-tour="aff-filter"]', title: 'Affiliate Filter', content: 'Select a specific affiliate to view their individual performance, charts, and earnings breakdown.', position: 'bottom' },
+  { tab: 'affiliates', target: '[data-tour="aff-perf-stats"]', title: 'Performance Stats', content: 'View attributed orders, revenue generated, commissions owed, and pending payouts for the selected affiliate or all affiliates.', position: 'bottom' },
+  { tab: 'affiliates', target: '[data-tour="aff-perf-charts"]', title: 'Revenue & Commission Charts', content: 'Track affiliate revenue and commission trends. Toggle between weekly and monthly views for deeper insight.', position: 'top' },
+  { tab: 'affiliates', target: '[data-tour="aff-top-table"]', title: 'Top Affiliates Leaderboard', content: 'See your highest-performing affiliates ranked by revenue, with order counts and commission totals.', position: 'top' },
+  { tab: 'affiliates', target: '[data-tour="aff-crud"]', title: 'Manage Affiliates', content: 'Create, edit, deactivate, or delete affiliates. Click "Add Affiliate" to onboard a new partner.', position: 'top' },
+
+  // Codes tab
+  { tab: 'codes', target: '[data-tour="codes-add"]', title: 'Add Discount Code', content: 'Create new discount codes and assign them to affiliates. Set discount percentages, commission overrides, labels, and expiry dates.', position: 'bottom' },
+  { tab: 'codes', target: '[data-tour="codes-table"]', title: 'Codes Table', content: 'View all discount codes with their assigned affiliate, discount/commission rates, usage count, expiry, and status. Search, sort, and manage codes here.', position: 'top' },
+
+  // Orders tab
+  { tab: 'orders', target: '[data-tour="orders-search"]', title: 'Search Orders', content: 'Search orders by customer name, items, discount code, or affiliate name.', position: 'bottom' },
+  { tab: 'orders', target: '[data-tour="orders-filter"]', title: 'Attribution Filter', content: 'Filter orders by attribution status — view all orders, only attributed (from affiliate codes), or non-attributed.', position: 'bottom' },
+  { tab: 'orders', target: '[data-tour="orders-table"]', title: 'Orders Table', content: 'Browse all orders with details including customer, items, discount code, affiliate, source, total, and commission. Click any row for full details.', position: 'top' },
+
+  // Payouts tab
+  { tab: 'payouts', target: '[data-tour="payouts-create"]', title: 'Create Payout', content: 'Record a new payout for an affiliate. Enter the amount, period, and optional notes.', position: 'bottom' },
+  { tab: 'payouts', target: '[data-tour="payouts-table"]', title: 'Payout History', content: 'Track all payouts with affiliate name, period, amount, status, and payment date. Mark pending payouts as paid when processed.', position: 'top' },
+
+  // Admins tab (Super Admin only)
+  { tab: 'admins', target: '[data-tour="admins-add"]', title: 'Add Admin', content: 'Create new admin users with either Admin or Super Admin roles. Super Admins can manage other admins and view system logs.', position: 'bottom' },
+  { tab: 'admins', target: '[data-tour="admins-table"]', title: 'Admin Management', content: 'View, edit, deactivate, or delete admin accounts. Use "View As" to see the panel from another admin\'s perspective.', position: 'top' },
+
+  // Logs tab (Super Admin only)
+  { tab: 'logs', target: '[data-tour="logs-subtabs"]', title: 'Log Types', content: 'Switch between Activity Logs (user actions like logins, CRUD operations) and System Logs (webhooks, errors, API events).', position: 'bottom' },
+  { tab: 'logs', target: '[data-tour="logs-content"]', title: 'Log Details', content: 'Browse all logged events with timestamps, users, action types, and expandable details. Use search and filters to find specific entries.', position: 'top' },
 ];
 
 export default function AdminPanel() {
@@ -79,7 +112,7 @@ export default function AdminPanel() {
         {tab === 'admins' && isSuperAdmin && <AdminsTab onViewAs={setViewAsUserId} />}
         {tab === 'logs' && isSuperAdmin && <LogsTab />}
       </div>
-      <Tutorial steps={ADMIN_TUTORIAL_STEPS} storageKey="tutorial_admin" />
+      <Tutorial steps={ADMIN_TUTORIAL_STEPS} storageKey="tutorial_admin" activeTab={tab} />
       {viewAsUserId && <ViewAsModal userId={viewAsUserId} onClose={() => setViewAsUserId(null)} />}
     </div>
   );
@@ -134,7 +167,7 @@ function BusinessOverviewTab() {
     <div>
       {/* Header with filters */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
+        <div data-tour="biz-source-filter" className="flex items-center gap-3">
           <label className="text-sm text-gray-500">Source:</label>
           <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
             className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[140px]">
@@ -151,7 +184,7 @@ function BusinessOverviewTab() {
       <div className="mb-2">
         <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Key Metrics</p>
       </div>
-      <div data-tour="admin-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div data-tour="biz-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total Revenue" value={formatMoney(stats.totalRevenue)} sub={`${stats.totalOrders} total orders`} />
         <StatCard label="Today" value={formatMoney(stats.todayRevenue)} sub={`${stats.todayOrders} orders today`} />
         <StatCard label="This Month" value={formatMoney(stats.monthRevenue)} sub={`${stats.monthOrders} orders this month`} />
@@ -159,7 +192,7 @@ function BusinessOverviewTab() {
       </div>
 
       {/* Attribution & Affiliate Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div data-tour="biz-attribution" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Conversion Rate" value={`${stats.conversionRate.toFixed(1)}%`} sub={`${stats.attributedOrders} of ${stats.totalOrders} attributed`} />
         <StatCard label="Non-Attributed" value={stats.nonAttributedOrders} sub={formatMoney(stats.nonAttributedRevenue)} />
         <StatCard label="Commissions Owed" value={formatMoney(stats.totalCommissions)} sub={`${formatMoney(stats.pendingPayouts)} pending payout`} />
@@ -167,7 +200,7 @@ function BusinessOverviewTab() {
       </div>
 
       {/* Charts Row 1: Revenue & Orders Volume */}
-      <div data-tour="admin-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+      <div data-tour="biz-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-medium text-gray-900">Revenue & Order Volume</h2>
           <div className="flex gap-1 bg-gray-100 rounded p-0.5">
@@ -211,7 +244,7 @@ function BusinessOverviewTab() {
       </div>
 
       {/* Charts Row 2: Commissions & Attribution Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div data-tour="biz-secondary-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <h2 className="text-sm font-medium text-gray-900 mb-4">Commissions Over Time</h2>
           {chartData.length > 0 ? (
@@ -390,7 +423,7 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
       {/* Affiliate Performance Overview */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
-          <div data-tour="admin-filter" className="flex items-center gap-3">
+          <div data-tour="aff-filter" className="flex items-center gap-3">
             <label className="text-sm text-gray-500">Filter by affiliate:</label>
             <select value={selectedAffiliate} onChange={(e) => setSelectedAffiliate(e.target.value)}
               className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[200px]">
@@ -414,7 +447,7 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
                 {selectedAffiliate ? `${selectedName}'s Performance` : 'Affiliate Performance'}
               </p>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div data-tour="aff-perf-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <StatCard
                 label={selectedAffiliate ? 'Their Orders' : 'Attributed Orders'}
                 value={perfStats.attributedOrders}
@@ -438,7 +471,7 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
             </div>
 
             {/* Charts */}
-            <div data-tour="admin-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+            <div data-tour="aff-perf-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-medium text-gray-900">Revenue & Commissions</h2>
                 <div className="flex gap-1 bg-gray-100 rounded p-0.5">
@@ -480,7 +513,7 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
 
             {/* Top Affiliates */}
             {!selectedAffiliate && topAffiliates.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-lg mb-6">
+              <div data-tour="aff-top-table" className="bg-white border border-gray-200 rounded-lg mb-6">
                 <div className="px-4 py-3 border-b border-gray-100">
                   <h2 className="text-sm font-medium text-gray-900">Top Affiliates</h2>
                 </div>
@@ -505,7 +538,7 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
       </div>
 
       {/* Affiliates CRUD Table */}
-      <div className="flex justify-between items-center mb-4">
+      <div data-tour="aff-crud" className="flex justify-between items-center mb-4">
         <h2 className="text-sm font-medium text-gray-900">{affiliates.length} Affiliates</h2>
         <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Affiliate</button>
       </div>
@@ -630,7 +663,7 @@ function CodesTab() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-sm font-medium text-gray-900">{codes.length} Discount Codes</h2>
-        <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Code</button>
+        <button data-tour="codes-add" onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Code</button>
       </div>
 
       {showForm && (
@@ -665,7 +698,7 @@ function CodesTab() {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div data-tour="codes-table" className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <DataTable
           columns={columns}
           data={codes}
@@ -746,7 +779,7 @@ function OrdersTab() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-medium text-gray-900">All Orders ({data.total})</h2>
         <div className="flex items-center gap-3">
-          <div className="relative">
+          <div data-tour="orders-search" className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
@@ -761,7 +794,7 @@ function OrdersTab() {
               <button onClick={() => { setSearch(''); setSearchDebounced(''); setPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">&times;</button>
             )}
           </div>
-          <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1">
+          <div data-tour="orders-filter" className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1">
             {([['all', 'All'], ['yes', 'Attributed'], ['no', 'Not Attributed']] as const).map(([val, label]) => (
               <button
                 key={val}
@@ -774,7 +807,7 @@ function OrdersTab() {
           </div>
         </div>
       </div>
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div data-tour="orders-table" className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <DataTable
           columns={columns}
           data={data.orders}
@@ -848,7 +881,7 @@ function PayoutsTab() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-sm font-medium text-gray-900">{payouts.length} Payouts</h2>
-        <button onClick={() => setShowForm(true)} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Create Payout</button>
+        <button data-tour="payouts-create" onClick={() => setShowForm(true)} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Create Payout</button>
       </div>
 
       {showForm && (
@@ -879,7 +912,7 @@ function PayoutsTab() {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div data-tour="payouts-table" className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <DataTable
           columns={columns}
           data={payouts}
@@ -988,7 +1021,7 @@ function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-sm font-medium text-gray-900">{admins.length} Admins</h2>
-        <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Admin</button>
+        <button data-tour="admins-add" onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Admin</button>
       </div>
 
       {showModal && (
@@ -1019,7 +1052,7 @@ function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div data-tour="admins-table" className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <DataTable
           columns={columns}
           data={admins}
@@ -1106,7 +1139,7 @@ function LogsTab() {
 
   return (
     <div>
-      <div className="flex gap-2 mb-4">
+      <div data-tour="logs-subtabs" className="flex gap-2 mb-4">
         <button onClick={() => setSubTab('activity')}
           className={`px-3 py-1.5 text-sm rounded-md ${subTab === 'activity' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:text-gray-900'}`}>
           Activity Logs
@@ -1116,7 +1149,9 @@ function LogsTab() {
           System Logs
         </button>
       </div>
-      {subTab === 'activity' ? <ActivityLogsPanel /> : <SystemLogsPanel />}
+      <div data-tour="logs-content">
+        {subTab === 'activity' ? <ActivityLogsPanel /> : <SystemLogsPanel />}
+      </div>
     </div>
   );
 }

@@ -5,26 +5,37 @@ export interface TutorialStep {
   title: string;
   content: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
+  tab?: string;         // if set, this step only shows when activeTab matches
 }
 
 interface TutorialProps {
   steps: TutorialStep[];
   storageKey: string;   // unique key per role (admin vs affiliate)
+  activeTab?: string;   // current active tab to filter steps
   onComplete?: () => void;
 }
 
-export default function Tutorial({ steps, storageKey, onComplete }: TutorialProps) {
+export default function Tutorial({ steps, storageKey, activeTab, onComplete }: TutorialProps) {
   const [active, setActive] = useState(false);
   const [step, setStep] = useState(0);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0, height: 0 });
   const tooltipRef = useRef<HTMLDivElement>(null);
 
+  // Filter steps: show global steps (no tab) + steps matching current tab
+  const visibleSteps = steps.filter(s => !s.tab || s.tab === activeTab);
+
+  // Build a per-tab storage key so each tab's tutorial is tracked independently
+  const effectiveKey = activeTab ? `${storageKey}_${activeTab}` : storageKey;
+
   useEffect(() => {
-    const seen = localStorage.getItem(storageKey);
+    const seen = localStorage.getItem(effectiveKey);
     if (!seen) {
-      setTimeout(() => setActive(true), 500);
+      setStep(0);
+      setTimeout(() => setActive(true), 600);
+    } else {
+      setActive(false);
     }
-  }, [storageKey]);
+  }, [effectiveKey]);
 
   useEffect(() => {
     if (!active) return;
@@ -35,11 +46,11 @@ export default function Tutorial({ steps, storageKey, onComplete }: TutorialProp
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition);
     };
-  }, [active, step]);
+  }, [active, step, visibleSteps.length]);
 
   function updatePosition() {
-    if (!active || step >= steps.length) return;
-    const el = document.querySelector(steps[step].target);
+    if (!active || step >= visibleSteps.length) return;
+    const el = document.querySelector(visibleSteps[step].target);
     if (el) {
       const rect = el.getBoundingClientRect();
       setPos({ top: rect.top + window.scrollY, left: rect.left + window.scrollX, width: rect.width, height: rect.height });
@@ -47,7 +58,7 @@ export default function Tutorial({ steps, storageKey, onComplete }: TutorialProp
   }
 
   function next() {
-    if (step < steps.length - 1) {
+    if (step < visibleSteps.length - 1) {
       setStep(step + 1);
     } else {
       finish();
@@ -60,14 +71,15 @@ export default function Tutorial({ steps, storageKey, onComplete }: TutorialProp
 
   function finish() {
     setActive(false);
-    localStorage.setItem(storageKey, 'true');
+    localStorage.setItem(effectiveKey, 'true');
     onComplete?.();
   }
 
   function restart() {
+    // Clear the current tab's tutorial key
+    localStorage.removeItem(effectiveKey);
     setStep(0);
     setActive(true);
-    localStorage.removeItem(storageKey);
   }
 
   if (!active) {
@@ -85,7 +97,9 @@ export default function Tutorial({ steps, storageKey, onComplete }: TutorialProp
     );
   }
 
-  const current = steps[step];
+  if (visibleSteps.length === 0) return null;
+
+  const current = visibleSteps[step];
   const padding = 8;
 
   // Calculate tooltip position
@@ -158,7 +172,7 @@ export default function Tutorial({ steps, storageKey, onComplete }: TutorialProp
         >
           <div className="flex items-start justify-between mb-2">
             <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{current.title}</h4>
-            <span className="text-xs text-gray-400 ml-4 whitespace-nowrap">{step + 1} / {steps.length}</span>
+            <span className="text-xs text-gray-400 ml-4 whitespace-nowrap">{step + 1} / {visibleSteps.length}</span>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">{current.content}</p>
 
@@ -166,7 +180,7 @@ export default function Tutorial({ steps, storageKey, onComplete }: TutorialProp
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 mb-3">
             <div
               className="bg-blue-500 h-1 rounded-full transition-all duration-300"
-              style={{ width: `${((step + 1) / steps.length) * 100}%` }}
+              style={{ width: `${((step + 1) / visibleSteps.length) * 100}%` }}
             />
           </div>
 
@@ -184,7 +198,7 @@ export default function Tutorial({ steps, storageKey, onComplete }: TutorialProp
                 </button>
               )}
               <button onClick={next} className="text-xs text-white bg-blue-600 px-3 py-1.5 rounded hover:bg-blue-700 font-medium">
-                {step === steps.length - 1 ? 'Finish' : 'Next'}
+                {step === visibleSteps.length - 1 ? 'Finish' : 'Next'}
               </button>
             </div>
           </div>
