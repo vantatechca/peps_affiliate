@@ -5,7 +5,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production';
 
 export interface AuthPayload {
   userId: string;
-  role: 'ADMIN' | 'AFFILIATE';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'AFFILIATE';
 }
 
 declare global {
