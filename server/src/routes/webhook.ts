@@ -23,7 +23,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'customer_first_name and order_total are required' });
     }
 
-    // Duplicate detection — only by external_order_id
+    // Duplicate detection — check by external_order_id OR same customer+amount within 5 minutes
     if (external_order_id) {
       const existing = await prisma.order.findFirst({
         where: { externalOrderId: external_order_id },
@@ -38,6 +38,26 @@ router.post('/order-paid', async (req: Request, res: Response) => {
           duplicate: true,
         });
       }
+    }
+
+    // Also check for same customer + same amount within last 5 minutes (catches Stripe→Shopify dupes)
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const recentDupe = await prisma.order.findFirst({
+      where: {
+        customerFirstName: customer_first_name,
+        orderTotal: parseFloat(order_total),
+        createdAt: { gte: fiveMinAgo },
+      },
+    });
+    if (recentDupe) {
+      console.log(`⏩ Duplicate order skipped (same customer+amount within 5min): ${customer_first_name} $${order_total}`);
+      return res.json({
+        success: true,
+        order_id: recentDupe.id,
+        attributed: recentDupe.attributed,
+        commission_earned: recentDupe.commissionEarned,
+        duplicate: true,
+      });
     }
 
     let discountCodeRecord = null;
