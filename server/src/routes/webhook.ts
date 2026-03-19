@@ -30,7 +30,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
 
     // Duplicate detection — only by external_order_id
     if (external_order_id) {
-      const existing = await prisma.order.findFirst({
+      const existing = await prisma.order.findUnique({
         where: { externalOrderId: external_order_id },
       });
       if (existing) {
@@ -123,20 +123,37 @@ router.post('/order-paid', async (req: Request, res: Response) => {
     }
 
     // Create order record
-    const order = await prisma.order.create({
-      data: {
-        externalOrderId: external_order_id || null,
-        discountCodeId: discountCodeRecord?.id || null,
-        customerFirstName: customer_first_name,
-        itemsSummary: items_summary || '',
-        orderTotal: parseFloat(order_total),
-        commissionEarned,
-        attributed,
-        source,
-        storeName: source_store || store_name || null,
-        currency: currency.toUpperCase(),
-      },
-    });
+    let order;
+    try {
+      order = await prisma.order.create({
+        data: {
+          externalOrderId: external_order_id || null,
+          discountCodeId: discountCodeRecord?.id || null,
+          customerFirstName: customer_first_name,
+          itemsSummary: items_summary || '',
+          orderTotal: parseFloat(order_total),
+          commissionEarned,
+          attributed,
+          source,
+          storeName: source_store || store_name || null,
+          currency: currency.toUpperCase(),
+        },
+      });
+    } catch (err: any) {
+      // Handle race condition: unique constraint on externalOrderId
+      if (err.code === 'P2002' && external_order_id) {
+        const existing = await prisma.order.findUnique({ where: { externalOrderId: external_order_id } });
+        console.log(`⏩ Duplicate order caught by DB constraint: ${external_order_id}`);
+        return res.json({
+          success: true,
+          order_id: existing?.id,
+          attributed: existing?.attributed,
+          commission_earned: existing?.commissionEarned,
+          duplicate: true,
+        });
+      }
+      throw err;
+    }
 
     console.log(
       `✅ Order saved: ${order.id} | Code: ${discount_code || 'none'} | Attributed: ${attributed} | Commission: $${commissionEarned}`
