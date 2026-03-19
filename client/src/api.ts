@@ -94,8 +94,21 @@ export const api = {
     request(`/charts/admin/business/weekly${source ? `?source=${source}` : ''}`),
   businessMonthly: (source?: string) =>
     request(`/charts/admin/business/monthly${source ? `?source=${source}` : ''}`),
-  businessStats: (source?: string) =>
-    request(`/charts/admin/business/stats${source ? `?source=${source}` : ''}`),
+  businessStats: (params?: { source?: string; startDate?: string; endDate?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.source) qs.set('source', params.source);
+    if (params?.startDate) qs.set('startDate', params.startDate);
+    if (params?.endDate) qs.set('endDate', params.endDate);
+    const q = qs.toString();
+    return request(`/charts/admin/business/stats${q ? `?${q}` : ''}`);
+  },
+  topStores: (params?: { startDate?: string; endDate?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.startDate) qs.set('startDate', params.startDate);
+    if (params?.endDate) qs.set('endDate', params.endDate);
+    const q = qs.toString();
+    return request(`/charts/admin/business/top-stores${q ? `?${q}` : ''}`);
+  },
 
   adminStats: (affiliateId?: string) =>
     request(`/admin/stats${affiliateId ? `?affiliateId=${affiliateId}` : ''}`),

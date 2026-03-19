@@ -314,12 +314,34 @@ router.get('/admin/business/monthly', async (req: Request, res: Response) => {
 // GET /api/charts/admin/business/stats - comprehensive business stats
 router.get('/admin/business/stats', async (req: Request, res: Response) => {
   try {
-    const { source } = req.query;
-    const sourceWhere: any = source ? { source: source as string } : {};
+    const { source, startDate, endDate } = req.query;
+    const baseWhere: any = {};
+    if (source) baseWhere.source = source as string;
+    if (startDate || endDate) {
+      baseWhere.createdAt = {};
+      if (startDate) baseWhere.createdAt.gte = new Date(startDate as string);
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        baseWhere.createdAt.lte = end;
+      }
+    }
 
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // For today/month stats, merge date range with baseWhere carefully
+    const todayWhere: any = { ...baseWhere };
+    const monthWhere: any = { ...baseWhere };
+    if (!startDate && !endDate) {
+      todayWhere.createdAt = { gte: todayStart };
+      monthWhere.createdAt = { gte: monthStart };
+    } else {
+      // When date filtered, today/month show the same filtered data
+      todayWhere.createdAt = baseWhere.createdAt;
+      monthWhere.createdAt = baseWhere.createdAt;
+    }
 
     const [
       totalOrders, totalRevenue,
@@ -331,16 +353,16 @@ router.get('/admin/business/stats', async (req: Request, res: Response) => {
       pendingPayouts,
       activeCodes,
     ] = await Promise.all([
-      prisma.order.count({ where: sourceWhere }),
-      prisma.order.aggregate({ where: sourceWhere, _sum: { orderTotal: true } }),
-      prisma.order.count({ where: { attributed: true, ...sourceWhere } }),
-      prisma.order.aggregate({ where: { attributed: true, ...sourceWhere }, _sum: { orderTotal: true } }),
-      prisma.order.aggregate({ where: { attributed: true, ...sourceWhere }, _sum: { commissionEarned: true } }),
-      prisma.order.count({ where: { attributed: false, ...sourceWhere } }),
-      prisma.order.count({ where: { createdAt: { gte: todayStart }, ...sourceWhere } }),
-      prisma.order.aggregate({ where: { createdAt: { gte: todayStart }, ...sourceWhere }, _sum: { orderTotal: true } }),
-      prisma.order.count({ where: { createdAt: { gte: monthStart }, ...sourceWhere } }),
-      prisma.order.aggregate({ where: { createdAt: { gte: monthStart }, ...sourceWhere }, _sum: { orderTotal: true } }),
+      prisma.order.count({ where: baseWhere }),
+      prisma.order.aggregate({ where: baseWhere, _sum: { orderTotal: true } }),
+      prisma.order.count({ where: { attributed: true, ...baseWhere } }),
+      prisma.order.aggregate({ where: { attributed: true, ...baseWhere }, _sum: { orderTotal: true } }),
+      prisma.order.aggregate({ where: { attributed: true, ...baseWhere }, _sum: { commissionEarned: true } }),
+      prisma.order.count({ where: { attributed: false, ...baseWhere } }),
+      prisma.order.count({ where: todayWhere }),
+      prisma.order.aggregate({ where: todayWhere, _sum: { orderTotal: true } }),
+      prisma.order.count({ where: monthWhere }),
+      prisma.order.aggregate({ where: monthWhere, _sum: { orderTotal: true } }),
       prisma.user.count({ where: { role: 'AFFILIATE' } }),
       prisma.user.count({ where: { role: 'AFFILIATE', active: true } }),
       prisma.payout.aggregate({ where: { status: 'PENDING' }, _sum: { amount: true } }),
@@ -368,6 +390,44 @@ router.get('/admin/business/stats', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Business stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/charts/admin/business/top-stores - revenue by source
+router.get('/admin/business/top-stores', async (req: Request, res: Response) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const where: any = {};
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate as string);
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    const orders = await prisma.order.groupBy({
+      by: ['source'],
+      where,
+      _sum: { orderTotal: true, commissionEarned: true },
+      _count: true,
+    });
+
+    const stores = orders
+      .map((g) => ({
+        source: g.source,
+        orders: g._count,
+        revenue: g._sum.orderTotal || 0,
+        commissions: g._sum.commissionEarned || 0,
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    res.json(stores);
+  } catch (error) {
+    console.error('Top stores error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

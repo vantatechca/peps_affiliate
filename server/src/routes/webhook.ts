@@ -14,6 +14,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
       order_total,
       discount_code,
       source = 'shopify',
+      currency = 'USD',
       external_order_id,
     } = req.body;
 
@@ -130,6 +131,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
         commissionEarned,
         attributed,
         source,
+        currency: currency.toUpperCase(),
       },
     });
 
