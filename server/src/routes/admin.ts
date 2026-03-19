@@ -124,6 +124,24 @@ router.delete('/affiliates/:id', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/affiliates/batch-delete
+router.post('/affiliates/batch-delete', async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids array is required' });
+    }
+    const targets = await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, email: true, name: true } });
+    const result = await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    logAudit({ ...auditFromReq(req), action: 'BATCH_DELETE_AFFILIATES', entity: 'User', details: { count: result.count, deleted: targets.map(t => ({ id: t.id, email: t.email, name: t.name })) } });
+    res.json({ success: true, deleted: result.count });
+  } catch (error) {
+    console.error('Batch delete affiliates error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Batch delete affiliates error', details: { error: String(error) } });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ============ DISCOUNT CODES ============
 
 // GET /api/admin/codes
@@ -224,12 +242,30 @@ router.delete('/codes/:id', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/codes/batch-delete
+router.post('/codes/batch-delete', async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids array is required' });
+    }
+    const targets = await prisma.discountCode.findMany({ where: { id: { in: ids } }, select: { id: true, code: true } });
+    const result = await prisma.discountCode.deleteMany({ where: { id: { in: ids } } });
+    logAudit({ ...auditFromReq(req), action: 'BATCH_DELETE_CODES', entity: 'DiscountCode', details: { count: result.count, deleted: targets.map(t => ({ id: t.id, code: t.code })) } });
+    res.json({ success: true, deleted: result.count });
+  } catch (error) {
+    console.error('Batch delete codes error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Batch delete codes error', details: { error: String(error) } });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ============ ORDERS ============
 
 // GET /api/admin/orders
 router.get('/orders', async (req: Request, res: Response) => {
   try {
-    const { page = '1', limit = '50', affiliateId, attributed, search } = req.query;
+    const { page = '1', limit = '50', affiliateId, attributed, search, startDate, endDate } = req.query;
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
     const where: any = {};
@@ -238,6 +274,17 @@ router.get('/orders', async (req: Request, res: Response) => {
     }
     if (attributed !== undefined) {
       where.attributed = attributed === 'true';
+    }
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate as string);
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
     }
     if (search) {
       const s = search as string;
@@ -282,6 +329,23 @@ router.delete('/orders/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Delete order error:', error);
     logSystem({ level: 'ERROR', source: 'API', message: 'Delete order error', details: { error: String(error), orderId: req.params.id } });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/orders/batch-delete
+router.post('/orders/batch-delete', async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids array is required' });
+    }
+    const result = await prisma.order.deleteMany({ where: { id: { in: ids } } });
+    logAudit({ ...auditFromReq(req), action: 'BATCH_DELETE_ORDERS', entity: 'Order', details: { count: result.count, ids } });
+    res.json({ success: true, deleted: result.count });
+  } catch (error) {
+    console.error('Batch delete orders error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Batch delete orders error', details: { error: String(error) } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

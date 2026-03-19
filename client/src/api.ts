@@ -37,8 +37,13 @@ export const api = {
 
   // Affiliate
   affiliateDashboard: () => request('/affiliate/dashboard'),
-  affiliateOrders: (period?: string, page = 1) =>
-    request(`/affiliate/orders?period=${period || ''}&page=${page}`),
+  affiliateOrders: (period?: string, page = 1, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams({ page: String(page) });
+    if (period) params.set('period', period);
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    return request(`/affiliate/orders?${params.toString()}`);
+  },
   affiliatePayouts: () => request('/affiliate/payouts'),
 
   // Admin
@@ -49,6 +54,8 @@ export const api = {
     request(`/admin/affiliates/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteAffiliate: (id: string) =>
     request(`/admin/affiliates/${id}`, { method: 'DELETE' }),
+  batchDeleteAffiliates: (ids: string[]) =>
+    request('/admin/affiliates/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
 
   getCodes: () => request('/admin/codes'),
   createCode: (data: any) =>
@@ -57,6 +64,8 @@ export const api = {
     request(`/admin/codes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteCode: (id: string) =>
     request(`/admin/codes/${id}`, { method: 'DELETE' }),
+  batchDeleteCodes: (ids: string[]) =>
+    request('/admin/codes/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
 
   getOrders: (params?: any) => {
     const qs = new URLSearchParams(params || {}).toString();
@@ -64,6 +73,8 @@ export const api = {
   },
   deleteOrder: (id: string) =>
     request(`/admin/orders/${id}`, { method: 'DELETE' }),
+  batchDeleteOrders: (ids: string[]) =>
+    request('/admin/orders/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
 
   getPayouts: () => request('/admin/payouts'),
   createPayout: (data: any) =>

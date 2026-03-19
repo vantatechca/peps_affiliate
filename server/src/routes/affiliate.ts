@@ -111,7 +111,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
 router.get('/orders', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { page = '1', limit = '50', period } = req.query;
+    const { page = '1', limit = '50', period, startDate, endDate } = req.query;
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
     const codes = await prisma.discountCode.findMany({
@@ -125,8 +125,18 @@ router.get('/orders', async (req: Request, res: Response) => {
       attributed: true,
     };
 
-    // Filter by period
-    if (period === 'today') {
+    // Filter by custom date range (takes priority over period)
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate as string);
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    } else if (period === 'today') {
       const start = new Date();
       start.setHours(0, 0, 0, 0);
       where.createdAt = { gte: start };
