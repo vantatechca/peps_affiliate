@@ -121,6 +121,7 @@ export default function AdminPanel() {
 // ============ BUSINESS OVERVIEW ============
 
 const PIE_COLORS = ['#111827', '#9ca3af'];
+const GATEWAY_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
 function BusinessOverviewTab() {
   const [stats, setStats] = useState<any>(null);
@@ -132,6 +133,7 @@ function BusinessOverviewTab() {
   const [endDate, setEndDate] = useState('');
   const [recentNonAttributed, setRecentNonAttributed] = useState<any[]>([]);
   const [topStores, setTopStores] = useState<any[]>([]);
+  const [sourceDist, setSourceDist] = useState<any[]>([]);
 
   useEffect(() => {
     api.getOrders({ limit: '10', attributed: 'false' }).then((d) => setRecentNonAttributed(d.orders));
@@ -148,10 +150,10 @@ function BusinessOverviewTab() {
     const storeParams: any = {};
     if (startDate) storeParams.startDate = startDate;
     if (endDate) storeParams.endDate = endDate;
-    const [s, w, m, stores] = await Promise.all([
-      api.businessStats(statsParams), api.businessWeekly(src), api.businessMonthly(src), api.topStores(storeParams),
+    const [s, w, m, stores, dist] = await Promise.all([
+      api.businessStats(statsParams), api.businessWeekly(src), api.businessMonthly(src), api.topStores(storeParams), api.sourceDistribution(storeParams),
     ]);
-    setStats(s); setWeeklyData(w); setMonthlyData(m); setTopStores(stores);
+    setStats(s); setWeeklyData(w); setMonthlyData(m); setTopStores(stores); setSourceDist(dist);
   }
 
   function handleDownloadPDF() {
@@ -254,8 +256,8 @@ function BusinessOverviewTab() {
         )}
       </div>
 
-      {/* Charts Row 2: Commissions & Attribution Breakdown */}
-      <div data-tour="biz-secondary-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      {/* Charts Row 2: Commissions, Attribution & Gateway Distribution */}
+      <div data-tour="biz-secondary-charts" className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <h2 className="text-sm font-medium text-gray-900 mb-4">Commissions Over Time</h2>
           {chartData.length > 0 ? (
@@ -287,6 +289,24 @@ function BusinessOverviewTab() {
             </ResponsiveContainer>
           ) : (
             <div className="text-sm text-gray-400 text-center py-12">No revenue data</div>
+          )}
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h2 className="text-sm font-medium text-gray-900 mb-4">Payment Gateway Distribution</h2>
+          {sourceDist.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={sourceDist.map(d => ({ name: d.source.charAt(0).toUpperCase() + d.source.slice(1), value: d.orders }))} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                  {sourceDist.map((_entry, index) => (
+                    <Cell key={`gw-${index}`} fill={GATEWAY_COLORS[index % GATEWAY_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => [`${value} orders`, '']} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-sm text-gray-400 text-center py-12">No data</div>
           )}
         </div>
       </div>

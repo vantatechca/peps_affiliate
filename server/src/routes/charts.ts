@@ -394,11 +394,11 @@ router.get('/admin/business/stats', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/charts/admin/business/top-stores - revenue by source
+// GET /api/charts/admin/business/top-stores - revenue by actual store name
 router.get('/admin/business/top-stores', async (req: Request, res: Response) => {
   try {
     const { startDate, endDate } = req.query;
-    const where: any = {};
+    const where: any = { storeName: { not: null } };
     if (startDate || endDate) {
       where.createdAt = {};
       if (startDate) where.createdAt.gte = new Date(startDate as string);
@@ -416,10 +416,10 @@ router.get('/admin/business/top-stores', async (req: Request, res: Response) => 
       _count: true,
     });
 
-    // Aggregate by storeName (fall back to source if storeName is null)
+    // Aggregate by storeName
     const storeMap = new Map<string, { name: string; source: string; orders: number; revenue: number; commissions: number }>();
     for (const g of orders) {
-      const name = g.storeName || g.source;
+      const name = g.storeName!;
       const existing = storeMap.get(name);
       if (existing) {
         existing.orders += g._count;
@@ -442,6 +442,41 @@ router.get('/admin/business/top-stores', async (req: Request, res: Response) => 
     res.json(stores);
   } catch (error) {
     console.error('Top stores error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/charts/admin/business/source-distribution - order counts by payment gateway
+router.get('/admin/business/source-distribution', async (req: Request, res: Response) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const where: any = {};
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate as string);
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    const groups = await prisma.order.groupBy({
+      by: ['source'],
+      where,
+      _count: true,
+      _sum: { orderTotal: true },
+    });
+
+    const distribution = groups.map((g) => ({
+      source: g.source,
+      orders: g._count,
+      revenue: g._sum.orderTotal || 0,
+    })).sort((a, b) => b.orders - a.orders);
+
+    res.json(distribution);
+  } catch (error) {
+    console.error('Source distribution error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
