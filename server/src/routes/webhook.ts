@@ -146,4 +146,30 @@ router.post('/order-paid', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/webhooks/valid-codes — public endpoint for Worker + theme.liquid
+router.get('/valid-codes', async (_req: Request, res: Response) => {
+  try {
+    const codes = await prisma.discountCode.findMany({
+      where: { active: true },
+      include: { affiliate: { select: { active: true } } },
+    });
+    const now = new Date();
+    const valid: Record<string, any> = {};
+    for (const c of codes) {
+      if (!c.affiliate.active) continue;
+      if (c.expiresAt && c.expiresAt < now) continue;
+      valid[c.code] = {
+        value: (c.discountPercent * 100).toFixed(1),
+        type: 'percentage',
+        title: `${(c.discountPercent * 100).toFixed(0)}% Off`,
+      };
+    }
+    res.set('Access-Control-Allow-Origin', '*');
+    res.json(valid);
+  } catch (error) {
+    console.error('Valid codes error:', error);
+    res.status(500).json({});
+  }
+});
+
 export default router;
