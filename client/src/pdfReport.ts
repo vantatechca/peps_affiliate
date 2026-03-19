@@ -150,6 +150,30 @@ export function downloadAffiliateReport(
   doc.save(`affiliate-report-${affiliateName.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
+export function downloadBusinessOverviewPDF(stats: any, sourceFilter?: string) {
+  const source = sourceFilter ? sourceFilter.charAt(0).toUpperCase() + sourceFilter.slice(1) : 'All Sources';
+
+  const doc = generatePDF({
+    title: 'Business Overview Report',
+    subtitle: `Source: ${source}`,
+    stats: [
+      { label: 'Total Revenue', value: formatMoney(stats.totalRevenue) + ` (${stats.totalOrders} orders)` },
+      { label: "Today's Revenue", value: formatMoney(stats.todayRevenue) + ` (${stats.todayOrders} orders)` },
+      { label: 'This Month', value: formatMoney(stats.monthRevenue) + ` (${stats.monthOrders} orders)` },
+      { label: 'Net Revenue', value: formatMoney(stats.netRevenue) },
+      { label: 'Conversion Rate', value: `${stats.conversionRate.toFixed(1)}%` },
+      { label: 'Attributed Orders', value: `${stats.attributedOrders} (${formatMoney(stats.attributedRevenue)})` },
+      { label: 'Non-Attributed Orders', value: `${stats.nonAttributedOrders} (${formatMoney(stats.nonAttributedRevenue)})` },
+      { label: 'Total Commissions', value: formatMoney(stats.totalCommissions) },
+      { label: 'Pending Payouts', value: formatMoney(stats.pendingPayouts) },
+      { label: 'Active Affiliates', value: stats.activeAffiliates.toString() },
+      { label: 'Active Codes', value: stats.activeCodes.toString() },
+    ],
+  });
+
+  doc.save(`business-overview-${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
 export function downloadAdminReport(
   stats: any,
   affiliates: any[],

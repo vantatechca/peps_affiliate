@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
-import { downloadAdminReport } from '../pdfReport';
+import { downloadBusinessOverviewPDF } from '../pdfReport';
 import DataTable, { Column } from '../components/DataTable';
 import OrderDetailModal from '../components/OrderDetailModal';
 import Tutorial, { TutorialStep } from '../components/Tutorial';
@@ -129,11 +129,8 @@ function BusinessOverviewTab() {
   const [chartView, setChartView] = useState<'weekly' | 'monthly'>('weekly');
   const [sourceFilter, setSourceFilter] = useState('');
   const [recentNonAttributed, setRecentNonAttributed] = useState<any[]>([]);
-  const [affiliates, setAffiliates] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
 
   useEffect(() => {
-    api.getAffiliates().then(setAffiliates);
     api.getOrders({ limit: '10', attributed: 'false' }).then((d) => setRecentNonAttributed(d.orders));
   }, []);
 
@@ -145,14 +142,11 @@ function BusinessOverviewTab() {
       api.businessStats(src), api.businessWeekly(src), api.businessMonthly(src),
     ]);
     setStats(s); setWeeklyData(w); setMonthlyData(m);
-    const orderParams: any = { limit: '100' };
-    const o = await api.getOrders(orderParams);
-    setOrders(o.orders);
   }
 
   function handleDownloadPDF() {
     if (!stats) return;
-    downloadAdminReport(stats, affiliates, orders);
+    downloadBusinessOverviewPDF(stats, sourceFilter);
   }
 
   if (!stats) return <div className="text-gray-500 text-sm">Loading...</div>;
@@ -174,6 +168,7 @@ function BusinessOverviewTab() {
             <option value="">All Sources</option>
             <option value="shopify">Shopify</option>
             <option value="wordpress">WordPress</option>
+            <option value="stripe">Stripe</option>
           </select>
           {sourceFilter && <button onClick={() => setSourceFilter('')} className="text-xs text-gray-500 hover:text-gray-900">Clear</button>}
         </div>
@@ -334,6 +329,7 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 // ============ AFFILIATES ============
 
 function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onViewAs?: (id: string) => void }) {
+  const [subTab, setSubTab] = useState<'performance' | 'manage'>('performance');
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
@@ -344,6 +340,7 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [topAffiliates, setTopAffiliates] = useState<any[]>([]);
   const [chartView, setChartView] = useState<'weekly' | 'monthly'>('weekly');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => { loadAffiliates(); api.adminTopAffiliates().then(setTopAffiliates); }, []);
   async function loadAffiliates() { setAffiliates(await api.getAffiliates()); }
@@ -386,7 +383,43 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
     await api.deleteAffiliate(aff.id); loadAffiliates();
   }
 
+  async function handleBatchDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} selected affiliate(s)? This will also delete their codes and orders.`)) return;
+    await api.batchDeleteAffiliates(Array.from(selectedIds));
+    setSelectedIds(new Set());
+    loadAffiliates();
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === affiliates.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(affiliates.map(a => a.id)));
+  }
+
+  function handleDownloadAffiliatesCSV() {
+    const headers = ['Name', 'Email', 'Password', 'Commission %', 'Codes', 'Status', 'Created'];
+    const rows = affiliates.map(a => [
+      a.name, a.email, a.passwordPlain || '',
+      (a.defaultCommissionRate * 100).toFixed(0) + '%',
+      (a.discountCodes?.length || 0).toString(),
+      a.active ? 'Active' : 'Inactive',
+      formatDate(a.createdAt),
+    ]);
+    downloadCSV(rows, headers, `affiliates-${new Date().toISOString().split('T')[0]}.csv`);
+  }
+
   const columns: Column[] = [
+    {
+      key: '_select', label: '', defaultWidth: 40, sortable: false,
+      render: (r: any) => (
+        <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => toggleSelect(r.id)}
+          className="rounded border-gray-300" onClick={(e) => e.stopPropagation()} />
+      ),
+    },
     { key: 'name', label: 'Name', defaultWidth: 160, className: 'text-gray-900 font-medium' },
     { key: 'email', label: 'Email', defaultWidth: 200, className: 'text-gray-600' },
     { key: 'passwordPlain', label: 'Password', defaultWidth: 140, render: (r: any) => <PasswordCell password={r.passwordPlain} /> },
@@ -420,171 +453,207 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
 
   return (
     <div>
-      {/* Affiliate Performance Overview */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div data-tour="aff-filter" className="flex items-center gap-3">
-            <label className="text-sm text-gray-500">Filter by affiliate:</label>
-            <select value={selectedAffiliate} onChange={(e) => setSelectedAffiliate(e.target.value)}
-              className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[200px]">
-              <option value="">All Affiliates</option>
-              {affiliates.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-            {selectedAffiliate && <button onClick={() => setSelectedAffiliate('')} className="text-xs text-gray-500 hover:text-gray-900">Clear</button>}
-          </div>
-        </div>
+      {/* Sub-tabs */}
+      <div className="flex gap-2 mb-6">
+        <button onClick={() => setSubTab('performance')}
+          className={`px-4 py-1.5 text-sm rounded-md ${subTab === 'performance' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:text-gray-900'}`}>
+          Performance
+        </button>
+        <button onClick={() => setSubTab('manage')}
+          className={`px-4 py-1.5 text-sm rounded-md ${subTab === 'manage' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:text-gray-900'}`}>
+          Manage Affiliates
+        </button>
+      </div>
 
-        {selectedAffiliate && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 mb-4 text-sm text-blue-800">
-            Showing data for <span className="font-semibold">{selectedName}</span>
-          </div>
-        )}
-
-        {perfStats && (
-          <>
-            <div className="mb-2">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-                {selectedAffiliate ? `${selectedName}'s Performance` : 'Affiliate Performance'}
-              </p>
-            </div>
-            <div data-tour="aff-perf-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard
-                label={selectedAffiliate ? 'Their Orders' : 'Attributed Orders'}
-                value={perfStats.attributedOrders}
-                sub={selectedAffiliate ? `${perfStats.totalOrders} total` : `${perfStats.totalOrders - perfStats.attributedOrders} without code`}
-              />
-              <StatCard
-                label={selectedAffiliate ? 'Their Revenue' : 'Affiliate Revenue'}
-                value={formatMoney(perfStats.totalRevenue)}
-                sub="From attributed orders"
-              />
-              <StatCard
-                label={selectedAffiliate ? 'Their Commissions' : 'Commissions Owed'}
-                value={formatMoney(perfStats.totalCommissions)}
-                sub={`${formatMoney(perfStats.pendingPayouts)} pending payout`}
-              />
-              {selectedAffiliate ? (
-                <StatCard label="Pending Payout" value={formatMoney(perfStats.pendingPayouts)} sub="Awaiting payment" />
-              ) : (
-                <StatCard label="Net Revenue" value={formatMoney((perfStats.totalRevenue || 0) - (perfStats.totalCommissions || 0))} sub="Revenue minus commissions" />
-              )}
-            </div>
-
-            {/* Charts */}
-            <div data-tour="aff-perf-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-medium text-gray-900">Revenue & Commissions</h2>
-                <div className="flex gap-1 bg-gray-100 rounded p-0.5">
-                  <button onClick={() => setChartView('weekly')} className={`px-3 py-1 text-xs rounded ${chartView === 'weekly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Weekly</button>
-                  <button onClick={() => setChartView('monthly')} className={`px-3 py-1 text-xs rounded ${chartView === 'monthly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Monthly</button>
-                </div>
+      {subTab === 'performance' && (
+        <div>
+          {/* Affiliate Performance Overview */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div data-tour="aff-filter" className="flex items-center gap-3">
+                <label className="text-sm text-gray-500">Filter by affiliate:</label>
+                <select value={selectedAffiliate} onChange={(e) => setSelectedAffiliate(e.target.value)}
+                  className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[200px]">
+                  <option value="">All Affiliates</option>
+                  {affiliates.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+                {selectedAffiliate && <button onClick={() => setSelectedAffiliate('')} className="text-xs text-gray-500 hover:text-gray-900">Clear</button>}
               </div>
-              {perfChartData.length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-2">Revenue</p>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <AreaChart data={perfChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
-                        <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
-                        <Area type="monotone" dataKey="revenue" stroke="#111827" fill="#f3f4f6" strokeWidth={2} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-2">Commissions Owed</p>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={perfChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
-                        <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
-                        <Bar dataKey="commissions" fill="#16a34a" radius={[3, 3, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-sm text-gray-400 text-center py-8">No chart data available</div>
-              )}
             </div>
 
-            {/* Top Affiliates */}
-            {!selectedAffiliate && topAffiliates.length > 0 && (
-              <div data-tour="aff-top-table" className="bg-white border border-gray-200 rounded-lg mb-6">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <h2 className="text-sm font-medium text-gray-900">Top Affiliates</h2>
-                </div>
-                <DataTable
-                  columns={topColumns}
-                  data={rankedAffiliates}
-                  footer={
-                    <tfoot>
-                      <tr className="bg-gray-50 border-t border-gray-200">
-                        <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={2}>Total</td>
-                        <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{topAffiliates.reduce((s, a) => s + a.orders, 0)}</td>
-                        <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.revenue, 0))}</td>
-                        <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.commissions, 0))}</td>
-                      </tr>
-                    </tfoot>
-                  }
-                />
+            {selectedAffiliate && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 mb-4 text-sm text-blue-800">
+                Showing data for <span className="font-semibold">{selectedName}</span>
               </div>
             )}
-          </>
-        )}
-      </div>
 
-      {/* Affiliates CRUD Table */}
-      <div data-tour="aff-crud" className="flex justify-between items-center mb-4">
-        <h2 className="text-sm font-medium text-gray-900">{affiliates.length} Affiliates</h2>
-        <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Affiliate</button>
-      </div>
+            {perfStats && (
+              <>
+                <div className="mb-2">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    {selectedAffiliate ? `${selectedName}'s Performance` : 'Affiliate Performance'}
+                  </p>
+                </div>
+                <div data-tour="aff-perf-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <StatCard
+                    label={selectedAffiliate ? 'Their Orders' : 'Attributed Orders'}
+                    value={perfStats.attributedOrders}
+                    sub={selectedAffiliate ? `${perfStats.totalOrders} total` : `${perfStats.totalOrders - perfStats.attributedOrders} without code`}
+                  />
+                  <StatCard
+                    label={selectedAffiliate ? 'Their Revenue' : 'Affiliate Revenue'}
+                    value={formatMoney(perfStats.totalRevenue)}
+                    sub="From attributed orders"
+                  />
+                  <StatCard
+                    label={selectedAffiliate ? 'Their Commissions' : 'Commissions Owed'}
+                    value={formatMoney(perfStats.totalCommissions)}
+                    sub={`${formatMoney(perfStats.pendingPayouts)} pending payout`}
+                  />
+                  {selectedAffiliate ? (
+                    <StatCard label="Pending Payout" value={formatMoney(perfStats.pendingPayouts)} sub="Awaiting payment" />
+                  ) : (
+                    <StatCard label="Net Revenue" value={formatMoney((perfStats.totalRevenue || 0) - (perfStats.totalCommissions || 0))} sub="Revenue minus commissions" />
+                  )}
+                </div>
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black bg-opacity-40" onClick={() => setShowModal(false)} />
-          <div className="relative bg-white rounded-lg border border-gray-200 w-full max-w-md mx-4 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-gray-900">{editing ? 'Edit' : 'New'} Affiliate</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <Input label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-              <Input label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
-              <Input label={editing ? 'New Password (leave blank to keep)' : 'Password'} value={form.password} onChange={(v) => setForm({ ...form, password: v })} required={!editing} />
-              <Input label="Commission %" type="number" value={form.defaultCommissionRate} onChange={(v) => setForm({ ...form, defaultCommissionRate: v })} />
-              <div className="flex gap-2 pt-2">
-                <button type="submit" className="flex-1 bg-gray-900 text-white text-sm px-4 py-2.5 rounded hover:bg-gray-800 font-medium">{editing ? 'Update' : 'Create'}</button>
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 text-sm text-gray-600 px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50">Cancel</button>
-              </div>
-            </form>
+                {/* Charts */}
+                <div data-tour="aff-perf-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-medium text-gray-900">Revenue & Commissions</h2>
+                    <div className="flex gap-1 bg-gray-100 rounded p-0.5">
+                      <button onClick={() => setChartView('weekly')} className={`px-3 py-1 text-xs rounded ${chartView === 'weekly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Weekly</button>
+                      <button onClick={() => setChartView('monthly')} className={`px-3 py-1 text-xs rounded ${chartView === 'monthly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Monthly</button>
+                    </div>
+                  </div>
+                  {perfChartData.length > 0 ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div>
+                        <p className="text-xs text-gray-500 mb-2">Revenue</p>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <AreaChart data={perfChartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
+                            <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
+                            <Area type="monotone" dataKey="revenue" stroke="#111827" fill="#f3f4f6" strokeWidth={2} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 mb-2">Commissions Owed</p>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <BarChart data={perfChartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
+                            <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
+                            <Bar dataKey="commissions" fill="#16a34a" radius={[3, 3, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-400 text-center py-8">No chart data available</div>
+                  )}
+                </div>
+
+                {/* Top Affiliates */}
+                {!selectedAffiliate && topAffiliates.length > 0 && (
+                  <div data-tour="aff-top-table" className="bg-white border border-gray-200 rounded-lg mb-6">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <h2 className="text-sm font-medium text-gray-900">Top Affiliates</h2>
+                    </div>
+                    <DataTable
+                      columns={topColumns}
+                      data={rankedAffiliates}
+                      footer={
+                        <tfoot>
+                          <tr className="bg-gray-50 border-t border-gray-200">
+                            <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={2}>Total</td>
+                            <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{topAffiliates.reduce((s, a) => s + a.orders, 0)}</td>
+                            <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.revenue, 0))}</td>
+                            <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.commissions, 0))}</td>
+                          </tr>
+                        </tfoot>
+                      }
+                    />
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <DataTable
-          columns={columns}
-          data={affiliates}
-          emptyMessage="No affiliates yet"
-          searchable
-          searchKeys={['name', 'email']}
-          searchPlaceholder="Search affiliates by name or email..."
-          footer={affiliates.length > 0 ? (
-            <tfoot>
-              <tr className="bg-gray-50 border-t border-gray-200">
-                <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={4}>Total ({affiliates.length} affiliates)</td>
-                <td className="px-4 py-3 text-gray-900 font-semibold text-sm">{affiliates.reduce((s, a) => s + (a.discountCodes?.length || 0), 0)} codes</td>
-                <td className="px-4 py-3 text-gray-900 font-semibold text-sm">{affiliates.filter(a => a.active).length} active</td>
-                <td className="px-4 py-3"></td>
-              </tr>
-            </tfoot>
-          ) : undefined}
-        />
-      </div>
+      {subTab === 'manage' && (
+        <div>
+          {/* Affiliates CRUD Table */}
+          <div data-tour="aff-crud" className="flex justify-between items-center mb-4">
+            <h2 className="text-sm font-medium text-gray-900">{affiliates.length} Affiliates</h2>
+            <div className="flex items-center gap-2">
+              {selectedIds.size > 0 && (
+                <button onClick={handleBatchDelete}
+                  className="text-sm bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700">
+                  Delete {selectedIds.size} selected
+                </button>
+              )}
+              <button onClick={handleDownloadAffiliatesCSV}
+                className="text-sm border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50">
+                Download CSV
+              </button>
+              <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Affiliate</button>
+            </div>
+          </div>
+
+          {showModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="fixed inset-0 bg-black bg-opacity-40" onClick={() => setShowModal(false)} />
+              <div className="relative bg-white rounded-lg border border-gray-200 w-full max-w-md mx-4 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-semibold text-gray-900">{editing ? 'Edit' : 'New'} Affiliate</h3>
+                  <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-3">
+                  <Input label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
+                  <Input label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
+                  <Input label={editing ? 'New Password (leave blank to keep)' : 'Password'} value={form.password} onChange={(v) => setForm({ ...form, password: v })} required={!editing} />
+                  <Input label="Commission %" type="number" value={form.defaultCommissionRate} onChange={(v) => setForm({ ...form, defaultCommissionRate: v })} />
+                  <div className="flex gap-2 pt-2">
+                    <button type="submit" className="flex-1 bg-gray-900 text-white text-sm px-4 py-2.5 rounded hover:bg-gray-800 font-medium">{editing ? 'Update' : 'Create'}</button>
+                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 text-sm text-gray-600 px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50">Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <DataTable
+              columns={columns}
+              data={affiliates}
+              emptyMessage="No affiliates yet"
+              searchable
+              searchKeys={['name', 'email']}
+              searchPlaceholder="Search affiliates by name or email..."
+              footer={affiliates.length > 0 ? (
+                <tfoot>
+                  <tr className="bg-gray-50 border-t border-gray-200">
+                    <td className="px-4 py-3">
+                      <input type="checkbox" checked={selectedIds.size === affiliates.length && affiliates.length > 0}
+                        onChange={toggleSelectAll} className="rounded border-gray-300" />
+                    </td>
+                    <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={3}>Total ({affiliates.length} affiliates)</td>
+                    <td className="px-4 py-3 text-gray-900 font-semibold text-sm">{affiliates.reduce((s, a) => s + (a.discountCodes?.length || 0), 0)} codes</td>
+                    <td className="px-4 py-3 text-gray-900 font-semibold text-sm">{affiliates.filter(a => a.active).length} active</td>
+                    <td className="px-4 py-3" colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              ) : undefined}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -597,6 +666,7 @@ function CodesTab() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ code: '', affiliateId: '', discountPercent: '10', commissionRateOverride: '', label: '', expiresAt: '' });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => { loadCodes(); api.getAffiliates().then(setAffiliates); }, []);
   async function loadCodes() { setCodes(await api.getCodes()); }
@@ -632,6 +702,23 @@ function CodesTab() {
   async function toggleActive(c: any) { await api.updateCode(c.id, { active: !c.active }); loadCodes(); }
   async function handleDelete(c: any) { if (!confirm(`Delete code "${c.code}"?`)) return; await api.deleteCode(c.id); loadCodes(); }
 
+  async function handleBatchDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} selected code(s)? This cannot be undone.`)) return;
+    await api.batchDeleteCodes(Array.from(selectedIds));
+    setSelectedIds(new Set());
+    loadCodes();
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === codes.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(codes.map(c => c.id)));
+  }
+
   function getCodeStatus(c: any) {
     if (!c.active) return { label: 'Inactive', color: 'text-gray-400' };
     if (c.expiresAt && new Date(c.expiresAt) < new Date()) return { label: 'Expired', color: 'text-red-600' };
@@ -639,6 +726,13 @@ function CodesTab() {
   }
 
   const columns: Column[] = [
+    {
+      key: '_select', label: '', defaultWidth: 40, sortable: false,
+      render: (r: any) => (
+        <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => toggleSelect(r.id)}
+          className="rounded border-gray-300" onClick={(e) => e.stopPropagation()} />
+      ),
+    },
     { key: 'code', label: 'Code', defaultWidth: 130, className: 'font-mono font-medium text-gray-900' },
     { key: 'affiliate.name', label: 'Affiliate', defaultWidth: 150, className: 'text-gray-600' },
     { key: 'discountPercent', label: 'Discount', defaultWidth: 100, render: (r: any) => formatPct(r.discountPercent), className: 'text-gray-600' },
@@ -663,7 +757,15 @@ function CodesTab() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-sm font-medium text-gray-900">{codes.length} Discount Codes</h2>
-        <button data-tour="codes-add" onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Code</button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button onClick={handleBatchDelete}
+              className="text-sm bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700">
+              Delete {selectedIds.size} selected
+            </button>
+          )}
+          <button data-tour="codes-add" onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Code</button>
+        </div>
       </div>
 
       {showForm && (
@@ -709,6 +811,10 @@ function CodesTab() {
           footer={codes.length > 0 ? (
             <tfoot>
               <tr className="bg-gray-50 border-t border-gray-200">
+                <td className="px-4 py-3">
+                  <input type="checkbox" checked={selectedIds.size === codes.length && codes.length > 0}
+                    onChange={toggleSelectAll} className="rounded border-gray-300" />
+                </td>
                 <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={5}>Total ({codes.length} codes)</td>
                 <td className="px-4 py-3 text-gray-900 font-semibold text-sm">{codes.reduce((s, c) => s + (c._count?.orders || 0), 0)}×</td>
                 <td className="px-4 py-3" colSpan={3}></td>
@@ -723,6 +829,15 @@ function CodesTab() {
 
 // ============ ORDERS ============
 
+function downloadCSV(rows: string[][], headers: string[], filename: string) {
+  const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 function OrdersTab() {
   const [data, setData] = useState<{ orders: any[]; total: number }>({ orders: [], total: 0 });
   const [page, setPage] = useState(1);
@@ -730,6 +845,9 @@ function OrdersTab() {
   const [filter, setFilter] = useState<'all' | 'yes' | 'no'>('all');
   const [search, setSearch] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const searchTimer = useRef<any>(null);
 
   function handleSearch(val: string) {
@@ -741,15 +859,17 @@ function OrdersTab() {
     }, 400);
   }
 
-  useEffect(() => { setPage(1); }, [filter]);
-  useEffect(() => { loadOrders(); }, [page, filter, searchDebounced]);
+  useEffect(() => { setPage(1); }, [filter, startDate, endDate]);
+  useEffect(() => { loadOrders(); }, [page, filter, searchDebounced, startDate, endDate]);
 
   function loadOrders() {
     const params: any = { page: page.toString(), limit: '50' };
     if (filter === 'yes') params.attributed = 'true';
     if (filter === 'no') params.attributed = 'false';
     if (searchDebounced.trim()) params.search = searchDebounced.trim();
-    api.getOrders(params).then(setData);
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    api.getOrders(params).then((d) => { setData(d); setSelectedIds(new Set()); });
   }
 
   async function handleDelete(id: string) {
@@ -758,10 +878,45 @@ function OrdersTab() {
     loadOrders();
   }
 
+  async function handleBatchDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} selected order(s)? This cannot be undone.`)) return;
+    await api.batchDeleteOrders(Array.from(selectedIds));
+    setSelectedIds(new Set());
+    loadOrders();
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === data.orders.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(data.orders.map(o => o.id)));
+  }
+
+  function handleDownloadCSV() {
+    const headers = ['Date', 'Customer', 'Items', 'Code', 'Affiliate', 'Source', 'Total', 'Commission', 'Attributed'];
+    const rows = data.orders.map(o => [
+      formatDateTime(o.createdAt), o.customerFirstName, o.itemsSummary,
+      o.discountCode?.code || '', o.discountCode?.affiliate?.name || '',
+      o.source, o.orderTotal.toFixed(2), o.commissionEarned.toFixed(2),
+      o.attributed ? 'Yes' : 'No',
+    ]);
+    downloadCSV(rows, headers, `orders-${new Date().toISOString().split('T')[0]}.csv`);
+  }
+
   const columns: Column[] = [
+    {
+      key: '_select', label: '', defaultWidth: 40, sortable: false,
+      render: (r: any) => (
+        <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => toggleSelect(r.id)}
+          className="rounded border-gray-300" onClick={(e) => e.stopPropagation()} />
+      ),
+    },
     { key: 'createdAt', label: 'Date & Time', defaultWidth: 180, render: (r: any) => <span className="text-gray-500 text-xs">{formatDateTime(r.createdAt)}</span> },
     { key: 'customerFirstName', label: 'Customer', defaultWidth: 120, className: 'text-gray-900' },
-    { key: 'itemsSummary', label: 'Items', defaultWidth: 250, className: 'text-gray-600' },
+    { key: 'itemsSummary', label: 'Items', defaultWidth: 220, className: 'text-gray-600' },
     { key: 'discountCode.code', label: 'Code', defaultWidth: 110, render: (r: any) => <span className="font-mono text-xs text-gray-500">{r.discountCode?.code || '—'}</span> },
     { key: 'discountCode.affiliate.name', label: 'Affiliate', defaultWidth: 130, render: (r: any) => r.discountCode?.affiliate?.name || '—', className: 'text-gray-600' },
     { key: 'source', label: 'Source', defaultWidth: 90, render: (r: any) => <span className="capitalize text-gray-500">{r.source}</span> },
@@ -776,9 +931,9 @@ function OrdersTab() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <h2 className="text-sm font-medium text-gray-900">All Orders ({data.total})</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div data-tour="orders-search" className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -807,6 +962,34 @@ function OrdersTab() {
           </div>
         </div>
       </div>
+
+      {/* Date Range Filter + Actions */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500">From:</label>
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-2 py-1" />
+          <label className="text-xs text-gray-500">To:</label>
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-2 py-1" />
+          {(startDate || endDate) && (
+            <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear dates</button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button onClick={handleBatchDelete}
+              className="text-sm bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700">
+              Delete {selectedIds.size} selected
+            </button>
+          )}
+          <button onClick={handleDownloadCSV}
+            className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">
+            Download CSV
+          </button>
+        </div>
+      </div>
+
       <div data-tour="orders-table" className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <DataTable
           columns={columns}
@@ -816,6 +999,10 @@ function OrdersTab() {
           footer={data.orders.length > 0 ? (
             <tfoot>
               <tr className="bg-gray-50 border-t border-gray-200">
+                <td className="px-4 py-3" >
+                  <input type="checkbox" checked={selectedIds.size === data.orders.length && data.orders.length > 0}
+                    onChange={toggleSelectAll} className="rounded border-gray-300" />
+                </td>
                 <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={6}>Total ({data.orders.length} orders on this page)</td>
                 <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(data.orders.reduce((s, o) => s + o.orderTotal, 0))}</td>
                 <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(data.orders.reduce((s, o) => s + o.commissionEarned, 0))}</td>

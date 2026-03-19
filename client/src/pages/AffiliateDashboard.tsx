@@ -64,6 +64,8 @@ export default function AffiliateDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [period, setPeriod] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [tab, setTab] = useState<'overview' | 'orders' | 'codes'>('overview');
   const [loading, setLoading] = useState(true);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
@@ -75,7 +77,7 @@ export default function AffiliateDashboard() {
     loadCharts();
   }, []);
 
-  useEffect(() => { loadOrders(); }, [period]);
+  useEffect(() => { loadOrders(); }, [period, startDate, endDate]);
 
   async function loadDashboard() {
     try {
@@ -95,10 +97,29 @@ export default function AffiliateDashboard() {
 
   async function loadOrders() {
     try {
-      const d = await api.affiliateOrders(period);
+      const d = await api.affiliateOrders(
+        startDate || endDate ? '' : period,
+        1,
+        startDate || undefined,
+        endDate || undefined,
+      );
       setOrders(d.orders);
       setOrdersTotal(d.total);
     } catch (err) { console.error(err); }
+  }
+
+  function handleDownloadCSV() {
+    const headers = ['Date', 'Customer', 'Items', 'Code', 'Order Total', 'Your Earning'];
+    const rows = orders.map(o => [
+      formatDateTime(o.date), o.customerFirstName, o.itemsSummary,
+      o.discountCode, o.orderTotal.toFixed(2), o.commissionEarned.toFixed(2),
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `orders-${new Date().toISOString().split('T')[0]}.csv`; a.click();
+    URL.revokeObjectURL(url);
   }
 
   function handleDownloadPDF() {
@@ -197,17 +218,38 @@ export default function AffiliateDashboard() {
 
         {(tab === 'overview' || tab === 'orders') && (
           <div data-tour={tab === 'overview' ? 'aff-recent-sales' : 'aff-orders-table'} className="bg-white border border-gray-200 rounded-lg">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-sm font-medium text-gray-900">
                 {tab === 'orders' ? `All Orders (${ordersTotal})` : 'Recent Sales'}
               </h2>
-              <select data-tour="aff-period-filter" value={period} onChange={(e) => setPeriod(e.target.value)}
-                className="text-sm border border-gray-300 rounded px-2 py-1">
-                <option value="">All time</option>
-                <option value="today">Today</option>
-                <option value="week">This week</option>
-                <option value="month">This month</option>
-              </select>
+              <div className="flex items-center gap-2 flex-wrap">
+                <select data-tour="aff-period-filter" value={startDate || endDate ? 'custom' : period} onChange={(e) => {
+                  if (e.target.value === 'custom') return;
+                  setPeriod(e.target.value); setStartDate(''); setEndDate('');
+                }}
+                  className="text-sm border border-gray-300 rounded px-2 py-1">
+                  <option value="">All time</option>
+                  <option value="today">Today</option>
+                  <option value="week">This week</option>
+                  <option value="month">This month</option>
+                  <option value="custom" disabled>Custom range</option>
+                </select>
+                <label className="text-xs text-gray-500">From:</label>
+                <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPeriod(''); }}
+                  className="text-sm border border-gray-300 rounded px-2 py-1" />
+                <label className="text-xs text-gray-500">To:</label>
+                <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPeriod(''); }}
+                  className="text-sm border border-gray-300 rounded px-2 py-1" />
+                {(startDate || endDate) && (
+                  <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear</button>
+                )}
+                {tab === 'orders' && (
+                  <button onClick={handleDownloadCSV}
+                    className="text-sm border border-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-50">
+                    Download CSV
+                  </button>
+                )}
+              </div>
             </div>
             <OrdersTable orders={tab === 'overview' ? orders.slice(0, 10) : orders} />
             {tab === 'overview' && orders.length > 10 && (
