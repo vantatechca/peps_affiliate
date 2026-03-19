@@ -54,7 +54,7 @@ model DiscountCode {
 
 model Order {
   id                String        @id @default(uuid())
-  externalOrderId   String?       @unique
+  externalOrderId   String?
   discountCodeId    String?
   discountCode      DiscountCode? @relation(fields: [discountCodeId], references: [id])
   customerFirstName String
