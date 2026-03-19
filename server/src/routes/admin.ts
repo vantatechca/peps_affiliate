@@ -2,10 +2,11 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../lib/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
+import { logAudit, logSystem, auditFromReq, enrichAuditUser } from '../lib/logger';
 
 const router = Router();
 
-router.use(authenticate, requireAdmin);
+router.use(authenticate, requireAdmin, enrichAuditUser);
 
 // ============ AFFILIATES ============
 
@@ -58,6 +59,8 @@ router.post('/affiliates', async (req: Request, res: Response) => {
       },
     });
 
+    logAudit({ ...auditFromReq(req), action: 'CREATE_AFFILIATE', entity: 'User', entityId: affiliate.id, details: { email: affiliate.email, name: affiliate.name } });
+
     res.status(201).json({
       id: affiliate.id,
       email: affiliate.email,
@@ -67,6 +70,7 @@ router.post('/affiliates', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Create affiliate error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Create affiliate error', details: { error: String(error) } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -89,6 +93,8 @@ router.patch('/affiliates/:id', async (req: Request, res: Response) => {
 
     const affiliate = await prisma.user.update({ where: { id }, data });
 
+    logAudit({ ...auditFromReq(req), action: 'UPDATE_AFFILIATE', entity: 'User', entityId: id, details: { changes: Object.keys(data) } });
+
     res.json({
       id: affiliate.id,
       email: affiliate.email,
@@ -99,6 +105,7 @@ router.patch('/affiliates/:id', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Update affiliate error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Update affiliate error', details: { error: String(error), affiliateId: req.params.id } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -106,10 +113,13 @@ router.patch('/affiliates/:id', async (req: Request, res: Response) => {
 // DELETE /api/admin/affiliates/:id
 router.delete('/affiliates/:id', async (req: Request, res: Response) => {
   try {
+    const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { email: true, name: true } });
     await prisma.user.delete({ where: { id: req.params.id } });
+    logAudit({ ...auditFromReq(req), action: 'DELETE_AFFILIATE', entity: 'User', entityId: req.params.id, details: { deletedEmail: target?.email, deletedName: target?.name } });
     res.json({ success: true });
   } catch (error) {
     console.error('Delete affiliate error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Delete affiliate error', details: { error: String(error), affiliateId: req.params.id } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -161,9 +171,12 @@ router.post('/codes', async (req: Request, res: Response) => {
       },
     });
 
+    logAudit({ ...auditFromReq(req), action: 'CREATE_CODE', entity: 'DiscountCode', entityId: discountCode.id, details: { code: discountCode.code, affiliateId } });
+
     res.status(201).json(discountCode);
   } catch (error) {
     console.error('Create code error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Create code error', details: { error: String(error) } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -187,9 +200,12 @@ router.patch('/codes/:id', async (req: Request, res: Response) => {
       include: { affiliate: { select: { id: true, name: true } } },
     });
 
+    logAudit({ ...auditFromReq(req), action: 'UPDATE_CODE', entity: 'DiscountCode', entityId: id, details: { code: code.code, changes: Object.keys(data) } });
+
     res.json(code);
   } catch (error) {
     console.error('Update code error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Update code error', details: { error: String(error), codeId: req.params.id } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -197,10 +213,13 @@ router.patch('/codes/:id', async (req: Request, res: Response) => {
 // DELETE /api/admin/codes/:id
 router.delete('/codes/:id', async (req: Request, res: Response) => {
   try {
+    const target = await prisma.discountCode.findUnique({ where: { id: req.params.id }, select: { code: true } });
     await prisma.discountCode.delete({ where: { id: req.params.id } });
+    logAudit({ ...auditFromReq(req), action: 'DELETE_CODE', entity: 'DiscountCode', entityId: req.params.id, details: { deletedCode: target?.code } });
     res.json({ success: true });
   } catch (error) {
     console.error('Delete code error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Delete code error', details: { error: String(error), codeId: req.params.id } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -256,10 +275,13 @@ router.get('/orders', async (req: Request, res: Response) => {
 // DELETE /api/admin/orders/:id
 router.delete('/orders/:id', async (req: Request, res: Response) => {
   try {
+    const target = await prisma.order.findUnique({ where: { id: req.params.id }, select: { externalOrderId: true, customerFirstName: true, orderTotal: true } });
     await prisma.order.delete({ where: { id: req.params.id } });
+    logAudit({ ...auditFromReq(req), action: 'DELETE_ORDER', entity: 'Order', entityId: req.params.id, details: { externalOrderId: target?.externalOrderId, customer: target?.customerFirstName, total: target?.orderTotal } });
     res.json({ success: true });
   } catch (error) {
     console.error('Delete order error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Delete order error', details: { error: String(error), orderId: req.params.id } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -294,9 +316,12 @@ router.post('/payouts', async (req: Request, res: Response) => {
       include: { affiliate: { select: { id: true, name: true } } },
     });
 
+    logAudit({ ...auditFromReq(req), action: 'CREATE_PAYOUT', entity: 'Payout', entityId: payout.id, details: { affiliateId, amount, period } });
+
     res.status(201).json(payout);
   } catch (error) {
     console.error('Create payout error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Create payout error', details: { error: String(error) } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -321,9 +346,12 @@ router.patch('/payouts/:id', async (req: Request, res: Response) => {
       include: { affiliate: { select: { id: true, name: true } } },
     });
 
+    logAudit({ ...auditFromReq(req), action: 'UPDATE_PAYOUT', entity: 'Payout', entityId: req.params.id, details: { changes: Object.keys(data), newStatus: status } });
+
     res.json(payout);
   } catch (error) {
     console.error('Update payout error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Update payout error', details: { error: String(error), payoutId: req.params.id } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

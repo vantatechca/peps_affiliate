@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
+import { logSystem } from '../lib/logger';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
     } = req.body;
 
     console.log('📥 Webhook received:', JSON.stringify(req.body));
+    logSystem({ source: 'WEBHOOK', message: 'Webhook received', details: { source, external_order_id, discount_code, order_total } });
 
     // Validate required fields
     if (!customer_first_name || !order_total) {
@@ -111,6 +113,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
         // List all codes in DB for debugging
         const allCodes = await prisma.discountCode.findMany({ select: { code: true } });
         console.log('📋 Codes in database:', allCodes.map(c => c.code).join(', '));
+        logSystem({ level: 'WARN', source: 'WEBHOOK', message: `No matching discount code found: "${codeToFind}"`, details: { codeAttempted: codeToFind, availableCodes: allCodes.map(c => c.code) } });
       }
     } else {
       console.log('ℹ️ No discount code provided in webhook');
@@ -134,6 +137,8 @@ router.post('/order-paid', async (req: Request, res: Response) => {
       `✅ Order saved: ${order.id} | Code: ${discount_code || 'none'} | Attributed: ${attributed} | Commission: $${commissionEarned}`
     );
 
+    logSystem({ source: 'WEBHOOK', message: `Order processed: ${order.id}`, details: { orderId: order.id, discountCode: discount_code, attributed, commissionEarned, orderTotal: order_total, source } });
+
     res.json({
       success: true,
       order_id: order.id,
@@ -142,6 +147,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Webhook error:', error);
+    logSystem({ level: 'ERROR', source: 'WEBHOOK', message: 'Webhook processing error', details: { error: String(error), body: req.body } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

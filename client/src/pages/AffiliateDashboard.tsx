@@ -11,11 +11,22 @@ import {
 } from 'recharts';
 
 const AFFILIATE_TUTORIAL_STEPS: TutorialStep[] = [
+  // Global steps (shown on every tab)
   { target: '[data-tour="aff-stats"]', title: 'Your Earnings', content: "See your earnings at a glance — today's, this month's, all time, and pending payouts.", position: 'bottom' },
   { target: '[data-tour="aff-charts"]', title: 'Sales Charts', content: 'View your revenue and earnings over time. Toggle between weekly and monthly views.', position: 'top' },
   { target: '[data-tour="aff-tabs"]', title: 'Navigation', content: 'Switch between Overview (recent sales), all Orders, and your discount Codes.', position: 'bottom' },
   { target: '[data-tour="aff-pdf"]', title: 'Download Report', content: 'Export a PDF report of your sales and earnings to share or keep for your records.', position: 'bottom' },
   { target: '[data-tour="theme-toggle"]', title: 'Dark Mode', content: 'Toggle between light and dark mode.', position: 'left' },
+
+  // Overview tab
+  { tab: 'overview', target: '[data-tour="aff-recent-sales"]', title: 'Recent Sales', content: 'Your 10 most recent orders appear here. Click any row to see full order details including customer info and items.', position: 'top' },
+
+  // Orders tab
+  { tab: 'orders', target: '[data-tour="aff-period-filter"]', title: 'Time Period Filter', content: 'Filter orders by time period — view today\'s, this week\'s, this month\'s, or all-time orders.', position: 'bottom' },
+  { tab: 'orders', target: '[data-tour="aff-orders-table"]', title: 'All Orders', content: 'Browse all your orders with date, customer, items, discount code used, order total, and your earnings. Click any row for details.', position: 'top' },
+
+  // Codes tab
+  { tab: 'codes', target: '[data-tour="aff-codes-table"]', title: 'Your Discount Codes', content: 'See all your assigned discount codes with their discount percentage, usage count, expiry date, and status. Share active codes with customers.', position: 'top' },
 ];
 
 interface DashboardData {
@@ -185,12 +196,12 @@ export default function AffiliateDashboard() {
         </div>
 
         {(tab === 'overview' || tab === 'orders') && (
-          <div className="bg-white border border-gray-200 rounded-lg">
+          <div data-tour={tab === 'overview' ? 'aff-recent-sales' : 'aff-orders-table'} className="bg-white border border-gray-200 rounded-lg">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-sm font-medium text-gray-900">
                 {tab === 'orders' ? `All Orders (${ordersTotal})` : 'Recent Sales'}
               </h2>
-              <select value={period} onChange={(e) => setPeriod(e.target.value)}
+              <select data-tour="aff-period-filter" value={period} onChange={(e) => setPeriod(e.target.value)}
                 className="text-sm border border-gray-300 rounded px-2 py-1">
                 <option value="">All time</option>
                 <option value="today">Today</option>
@@ -213,7 +224,7 @@ export default function AffiliateDashboard() {
         )}
 
         {tab === 'codes' && (
-          <div className="bg-white border border-gray-200 rounded-lg">
+          <div data-tour="aff-codes-table" className="bg-white border border-gray-200 rounded-lg">
             <div className="px-4 py-3 border-b border-gray-100">
               <h2 className="text-sm font-medium text-gray-900">Your Discount Codes</h2>
             </div>
@@ -240,7 +251,7 @@ export default function AffiliateDashboard() {
           </div>
         )}
       </div>
-      <Tutorial steps={AFFILIATE_TUTORIAL_STEPS} storageKey="tutorial_affiliate" />
+      <Tutorial steps={AFFILIATE_TUTORIAL_STEPS} storageKey="tutorial_affiliate" activeTab={tab} />
     </div>
   );
 }

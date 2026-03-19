@@ -83,3 +83,43 @@ model Payout {
 
   @@index([affiliateId])
 }
+
+// ============ LOGGING ============
+
+enum LogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  userEmail   String?
+  userName    String?
+  userRole    String?
+  action      String   // e.g. "LOGIN", "CREATE_AFFILIATE", "DELETE_ORDER"
+  entity      String?  // e.g. "User", "Order", "DiscountCode"
+  entityId    String?
+  details     String?  // JSON string with extra context
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([entity])
+}
+
+model SystemLog {
+  id         String   @id @default(uuid())
+  level      LogLevel @default(INFO)
+  source     String   // e.g. "WEBHOOK", "API", "AUTH", "SYSTEM"
+  message    String
+  details    String?  // JSON string with stack traces, payloads, etc.
+  createdAt  DateTime @default(now())
+
+  @@index([level])
+  @@index([source])
+  @@index([createdAt])
+}

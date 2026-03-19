@@ -79,6 +79,12 @@ export const api = {
   adminMonthly: (affiliateId?: string) =>
     request(`/charts/admin/monthly${affiliateId ? `?affiliateId=${affiliateId}` : ''}`),
   adminTopAffiliates: () => request('/charts/admin/top-affiliates'),
+  businessWeekly: (source?: string) =>
+    request(`/charts/admin/business/weekly${source ? `?source=${source}` : ''}`),
+  businessMonthly: (source?: string) =>
+    request(`/charts/admin/business/monthly${source ? `?source=${source}` : ''}`),
+  businessStats: (source?: string) =>
+    request(`/charts/admin/business/stats${source ? `?source=${source}` : ''}`),
 
   adminStats: (affiliateId?: string) =>
     request(`/admin/stats${affiliateId ? `?affiliateId=${affiliateId}` : ''}`),
@@ -93,4 +99,16 @@ export const api = {
     request(`/super/admins/${id}`, { method: 'DELETE' }),
   viewAs: (userId: string) => request(`/super/view-as/${userId}`),
   getAllUsers: () => request('/super/all-users'),
+
+  // Logs
+  getAuditLogs: (params?: any) => {
+    const qs = new URLSearchParams(params || {}).toString();
+    return request(`/logs/audit?${qs}`);
+  },
+  getAuditStats: () => request('/logs/audit/stats'),
+  getAuditActions: () => request('/logs/audit/actions'),
+  getSystemLogs: (params?: any) => {
+    const qs = new URLSearchParams(params || {}).toString();
+    return request(`/logs/system?${qs}`);
+  },
 };

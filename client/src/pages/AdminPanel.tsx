@@ -9,7 +9,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import ViewAsModal from '../components/ViewAsModal';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  AreaChart, Area,
+  AreaChart, Area, LineChart, Line, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 
 function formatMoney(n: number) { return `$${n.toFixed(2)}`; }
@@ -18,23 +18,66 @@ function formatDateTime(d: string) { return new Date(d).toLocaleString('en-US', 
 function formatPct(n: number) { return `${(n * 100).toFixed(0)}%`; }
 
 const ADMIN_TUTORIAL_STEPS: TutorialStep[] = [
-  { target: '[data-tour="admin-tabs"]', title: 'Navigation Tabs', content: 'Switch between Overview, Affiliates, Codes, Orders, and Payouts to manage your affiliate program.', position: 'bottom' },
-  { target: '[data-tour="admin-stats"]', title: 'Dashboard Overview', content: 'See your total affiliates, orders, revenue, and commissions at a glance. Use the filter to view a specific affiliate\'s performance.', position: 'bottom' },
-  { target: '[data-tour="admin-charts"]', title: 'Revenue Charts', content: 'Toggle between weekly and monthly views to track revenue and commissions over time.', position: 'top' },
-  { target: '[data-tour="admin-filter"]', title: 'Affiliate Filter', content: 'Select an affiliate from the dropdown to view their individual performance, charts, and orders.', position: 'bottom' },
-  { target: '[data-tour="admin-pdf"]', title: 'Download Reports', content: 'Export a PDF report of all affiliate data, including orders and commissions.', position: 'bottom' },
+  // Global steps (shown on every tab)
+  { target: '[data-tour="admin-tabs"]', title: 'Navigation Tabs', content: 'Switch between Business Overview, Affiliates, Codes, Orders, Payouts, and more to manage your affiliate program.', position: 'bottom' },
   { target: '[data-tour="theme-toggle"]', title: 'Dark Mode', content: 'Toggle between light and dark mode for your preferred viewing experience.', position: 'left' },
+
+  // Business Overview tab
+  { tab: 'business', target: '[data-tour="biz-source-filter"]', title: 'Source Filter', content: 'Filter all metrics by order source — Shopify, WordPress, or view everything combined.', position: 'bottom' },
+  { tab: 'business', target: '[data-tour="biz-stats"]', title: 'Key Metrics', content: 'See total revenue, today\'s and this month\'s performance, net revenue after commissions, and more at a glance.', position: 'bottom' },
+  { tab: 'business', target: '[data-tour="biz-attribution"]', title: 'Attribution & Affiliates', content: 'Track conversion rate, non-attributed orders, commissions owed, and active affiliates in your program.', position: 'bottom' },
+  { tab: 'business', target: '[data-tour="biz-charts"]', title: 'Revenue & Order Volume', content: 'Visualize revenue trends and order volume over time. Toggle between weekly and monthly views.', position: 'top' },
+  { tab: 'business', target: '[data-tour="biz-secondary-charts"]', title: 'Commissions & Attribution', content: 'Track commission payouts over time and see how revenue splits between attributed and non-attributed orders.', position: 'top' },
+  { tab: 'business', target: '[data-tour="admin-pdf"]', title: 'Download Report', content: 'Export a comprehensive PDF report of all business data including orders, affiliates, and revenue.', position: 'bottom' },
+
+  // Affiliates tab
+  { tab: 'affiliates', target: '[data-tour="aff-filter"]', title: 'Affiliate Filter', content: 'Select a specific affiliate to view their individual performance, charts, and earnings breakdown.', position: 'bottom' },
+  { tab: 'affiliates', target: '[data-tour="aff-perf-stats"]', title: 'Performance Stats', content: 'View attributed orders, revenue generated, commissions owed, and pending payouts for the selected affiliate or all affiliates.', position: 'bottom' },
+  { tab: 'affiliates', target: '[data-tour="aff-perf-charts"]', title: 'Revenue & Commission Charts', content: 'Track affiliate revenue and commission trends. Toggle between weekly and monthly views for deeper insight.', position: 'top' },
+  { tab: 'affiliates', target: '[data-tour="aff-top-table"]', title: 'Top Affiliates Leaderboard', content: 'See your highest-performing affiliates ranked by revenue, with order counts and commission totals.', position: 'top' },
+  { tab: 'affiliates', target: '[data-tour="aff-crud"]', title: 'Manage Affiliates', content: 'Create, edit, deactivate, or delete affiliates. Click "Add Affiliate" to onboard a new partner.', position: 'top' },
+
+  // Codes tab
+  { tab: 'codes', target: '[data-tour="codes-add"]', title: 'Add Discount Code', content: 'Create new discount codes and assign them to affiliates. Set discount percentages, commission overrides, labels, and expiry dates.', position: 'bottom' },
+  { tab: 'codes', target: '[data-tour="codes-table"]', title: 'Codes Table', content: 'View all discount codes with their assigned affiliate, discount/commission rates, usage count, expiry, and status. Search, sort, and manage codes here.', position: 'top' },
+
+  // Orders tab
+  { tab: 'orders', target: '[data-tour="orders-search"]', title: 'Search Orders', content: 'Search orders by customer name, items, discount code, or affiliate name.', position: 'bottom' },
+  { tab: 'orders', target: '[data-tour="orders-filter"]', title: 'Attribution Filter', content: 'Filter orders by attribution status — view all orders, only attributed (from affiliate codes), or non-attributed.', position: 'bottom' },
+  { tab: 'orders', target: '[data-tour="orders-table"]', title: 'Orders Table', content: 'Browse all orders with details including customer, items, discount code, affiliate, source, total, and commission. Click any row for full details.', position: 'top' },
+
+  // Payouts tab
+  { tab: 'payouts', target: '[data-tour="payouts-create"]', title: 'Create Payout', content: 'Record a new payout for an affiliate. Enter the amount, period, and optional notes.', position: 'bottom' },
+  { tab: 'payouts', target: '[data-tour="payouts-table"]', title: 'Payout History', content: 'Track all payouts with affiliate name, period, amount, status, and payment date. Mark pending payouts as paid when processed.', position: 'top' },
+
+  // Admins tab (Super Admin only)
+  { tab: 'admins', target: '[data-tour="admins-add"]', title: 'Add Admin', content: 'Create new admin users with either Admin or Super Admin roles. Super Admins can manage other admins and view system logs.', position: 'bottom' },
+  { tab: 'admins', target: '[data-tour="admins-table"]', title: 'Admin Management', content: 'View, edit, deactivate, or delete admin accounts. Use "View As" to see the panel from another admin\'s perspective.', position: 'top' },
+
+  // Logs tab (Super Admin only)
+  { tab: 'logs', target: '[data-tour="logs-subtabs"]', title: 'Log Types', content: 'Switch between Activity Logs (user actions like logins, CRUD operations) and System Logs (webhooks, errors, API events).', position: 'bottom' },
+  { tab: 'logs', target: '[data-tour="logs-content"]', title: 'Log Details', content: 'Browse all logged events with timestamps, users, action types, and expandable details. Use search and filters to find specific entries.', position: 'top' },
 ];
 
 export default function AdminPanel() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState<'overview' | 'affiliates' | 'codes' | 'orders' | 'payouts' | 'admins'>('overview');
+  const [tab, setTab] = useState<'business' | 'affiliates' | 'codes' | 'orders' | 'payouts' | 'admins' | 'logs'>('business');
   const [viewAsUserId, setViewAsUserId] = useState<string | null>(null);
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   const tabs = isSuperAdmin
-    ? (['overview', 'affiliates', 'codes', 'orders', 'payouts', 'admins'] as const)
-    : (['overview', 'affiliates', 'codes', 'orders', 'payouts'] as const);
+    ? (['business', 'affiliates', 'codes', 'orders', 'payouts', 'admins', 'logs'] as const)
+    : (['business', 'affiliates', 'codes', 'orders', 'payouts'] as const);
+
+  const tabLabels: Record<string, string> = {
+    business: 'Business Overview',
+    affiliates: 'Affiliates',
+    codes: 'Codes',
+    orders: 'Orders',
+    payouts: 'Payouts',
+    admins: 'Admins',
+    logs: 'Logs',
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -56,147 +99,110 @@ export default function AdminPanel() {
         <div data-tour="admin-tabs" className="flex gap-1 mb-6 bg-white border border-gray-200 rounded-lg p-1 w-fit">
           {tabs.map((t) => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-1.5 text-sm rounded-md capitalize ${tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
-              {t}
+              className={`px-4 py-1.5 text-sm rounded-md ${tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+              {tabLabels[t] || t}
             </button>
           ))}
         </div>
-        {tab === 'overview' && <OverviewTab />}
+        {tab === 'business' && <BusinessOverviewTab />}
         {tab === 'affiliates' && <AffiliatesTab isSuperAdmin={isSuperAdmin} onViewAs={setViewAsUserId} />}
         {tab === 'codes' && <CodesTab />}
         {tab === 'orders' && <OrdersTab />}
         {tab === 'payouts' && <PayoutsTab />}
         {tab === 'admins' && isSuperAdmin && <AdminsTab onViewAs={setViewAsUserId} />}
+        {tab === 'logs' && isSuperAdmin && <LogsTab />}
       </div>
-      <Tutorial steps={ADMIN_TUTORIAL_STEPS} storageKey="tutorial_admin" />
+      <Tutorial steps={ADMIN_TUTORIAL_STEPS} storageKey="tutorial_admin" activeTab={tab} />
       {viewAsUserId && <ViewAsModal userId={viewAsUserId} onClose={() => setViewAsUserId(null)} />}
     </div>
   );
 }
 
-// ============ OVERVIEW WITH CHARTS ============
+// ============ BUSINESS OVERVIEW ============
 
-function OverviewTab() {
+const PIE_COLORS = ['#111827', '#9ca3af'];
+
+function BusinessOverviewTab() {
   const [stats, setStats] = useState<any>(null);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [topAffiliates, setTopAffiliates] = useState<any[]>([]);
   const [chartView, setChartView] = useState<'weekly' | 'monthly'>('weekly');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [recentNonAttributed, setRecentNonAttributed] = useState<any[]>([]);
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
-  const [recentNonAttributed, setRecentNonAttributed] = useState<any[]>([]);
-  const [selectedAffiliate, setSelectedAffiliate] = useState<string>('');
 
   useEffect(() => {
     api.getAffiliates().then(setAffiliates);
-    api.adminTopAffiliates().then(setTopAffiliates);
-    // Load recent non-attributed orders
     api.getOrders({ limit: '10', attributed: 'false' }).then((d) => setRecentNonAttributed(d.orders));
   }, []);
 
-  useEffect(() => { loadFilteredData(); }, [selectedAffiliate]);
+  useEffect(() => { loadData(); }, [sourceFilter]);
 
-  async function loadFilteredData() {
-    const affId = selectedAffiliate || undefined;
-    const [s, w, m] = await Promise.all([api.adminStats(affId), api.adminWeekly(affId), api.adminMonthly(affId)]);
+  async function loadData() {
+    const src = sourceFilter || undefined;
+    const [s, w, m] = await Promise.all([
+      api.businessStats(src), api.businessWeekly(src), api.businessMonthly(src),
+    ]);
     setStats(s); setWeeklyData(w); setMonthlyData(m);
     const orderParams: any = { limit: '100' };
-    if (selectedAffiliate) orderParams.affiliateId = selectedAffiliate;
     const o = await api.getOrders(orderParams);
     setOrders(o.orders);
   }
 
   function handleDownloadPDF() {
     if (!stats) return;
-    const filteredOrders = selectedAffiliate ? orders.filter((o: any) => o.attributed) : orders;
-    downloadAdminReport(stats, affiliates, filteredOrders, selectedAffiliate ? selectedName : undefined);
+    downloadAdminReport(stats, affiliates, orders);
   }
 
-  const selectedName = selectedAffiliate ? affiliates.find((a) => a.id === selectedAffiliate)?.name || 'Affiliate' : 'All Affiliates';
   if (!stats) return <div className="text-gray-500 text-sm">Loading...</div>;
+
   const chartData = chartView === 'weekly' ? weeklyData : monthlyData;
-  const conversionRate = stats.totalOrders > 0 ? ((stats.attributedOrders / stats.totalOrders) * 100).toFixed(1) : '0';
-
-  const topColumns: Column[] = [
-    { key: '_rank', label: '#', defaultWidth: 50, sortable: false, render: (_r: any) => '' },
-    { key: 'name', label: 'Name', defaultWidth: 200, className: 'text-gray-900 font-medium' },
-    { key: 'orders', label: 'Orders', align: 'right', defaultWidth: 100, className: 'text-gray-600' },
-    { key: 'revenue', label: 'Revenue', align: 'right', defaultWidth: 130, render: (r: any) => formatMoney(r.revenue), className: 'text-gray-900' },
-    { key: 'commissions', label: 'Commissions', align: 'right', defaultWidth: 130, render: (r: any) => <span className="text-green-700 font-medium">{formatMoney(r.commissions)}</span> },
-  ];
-
-  const rankedAffiliates = topAffiliates.map((a, i) => ({ ...a, _rank: i + 1 }));
+  const pieData = [
+    { name: 'Attributed', value: stats.attributedRevenue },
+    { name: 'Non-Attributed', value: stats.nonAttributedRevenue },
+  ].filter(d => d.value > 0);
 
   return (
     <div>
+      {/* Header with filters */}
       <div className="flex items-center justify-between mb-4">
-        <div data-tour="admin-filter" className="flex items-center gap-3">
-          <label className="text-sm text-gray-500">Filter by affiliate:</label>
-          <select value={selectedAffiliate} onChange={(e) => setSelectedAffiliate(e.target.value)}
-            className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[200px]">
-            <option value="">All Affiliates</option>
-            {affiliates.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        <div data-tour="biz-source-filter" className="flex items-center gap-3">
+          <label className="text-sm text-gray-500">Source:</label>
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[140px]">
+            <option value="">All Sources</option>
+            <option value="shopify">Shopify</option>
+            <option value="wordpress">WordPress</option>
           </select>
-          {selectedAffiliate && <button onClick={() => setSelectedAffiliate('')} className="text-xs text-gray-500 hover:text-gray-900">Clear filter</button>}
+          {sourceFilter && <button onClick={() => setSourceFilter('')} className="text-xs text-gray-500 hover:text-gray-900">Clear</button>}
         </div>
         <button data-tour="admin-pdf" onClick={handleDownloadPDF} className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">Download PDF Report</button>
       </div>
 
-      {selectedAffiliate && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 mb-4 text-sm text-blue-800">
-          Showing data for <span className="font-semibold">{selectedName}</span>
-        </div>
-      )}
-
-      {/* Business Overview — all orders */}
-      {!selectedAffiliate && (
-        <>
-          <div className="mb-2">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Business Overview</p>
-          </div>
-          <div data-tour="admin-stats" className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-            <StatCard label="All Orders" value={stats.totalOrders} sub="Total orders received" />
-            <StatCard label="Total Revenue" value={formatMoney(stats.allOrdersRevenue || 0)} sub="From all orders" />
-            <StatCard label="Non-Attributed" value={stats.nonAttributedCount || 0} sub="No affiliate code used" />
-            <StatCard label="Affiliate Conversion" value={`${conversionRate}%`} sub={`${stats.attributedOrders} of ${stats.totalOrders} orders`} />
-            <StatCard label="Total Affiliates" value={stats.totalAffiliates} sub={`${stats.activeAffiliates} active`} />
-          </div>
-        </>
-      )}
-
-      {/* Affiliate Performance */}
+      {/* Key Metrics */}
       <div className="mb-2">
-        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-          {selectedAffiliate ? `${selectedName}'s Performance` : 'Affiliate Performance'}
-        </p>
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Key Metrics</p>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label={selectedAffiliate ? 'Their Orders' : 'Attributed Orders'}
-          value={stats.attributedOrders}
-          sub={selectedAffiliate ? `${stats.totalOrders} total` : `${stats.totalOrders - stats.attributedOrders} without code`}
-        />
-        <StatCard
-          label={selectedAffiliate ? 'Their Revenue' : 'Affiliate Revenue'}
-          value={formatMoney(stats.totalRevenue)}
-          sub="From attributed orders"
-        />
-        <StatCard
-          label={selectedAffiliate ? 'Their Commissions' : 'Commissions Owed'}
-          value={formatMoney(stats.totalCommissions)}
-          sub={`${formatMoney(stats.pendingPayouts)} pending payout`}
-        />
-        {selectedAffiliate ? (
-          <StatCard label="Pending Payout" value={formatMoney(stats.pendingPayouts)} sub="Awaiting payment" />
-        ) : (
-          <StatCard label="Net Revenue" value={formatMoney((stats.totalRevenue || 0) - (stats.totalCommissions || 0))} sub="Revenue minus commissions" />
-        )}
+      <div data-tour="biz-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard label="Total Revenue" value={formatMoney(stats.totalRevenue)} sub={`${stats.totalOrders} total orders`} />
+        <StatCard label="Today" value={formatMoney(stats.todayRevenue)} sub={`${stats.todayOrders} orders today`} />
+        <StatCard label="This Month" value={formatMoney(stats.monthRevenue)} sub={`${stats.monthOrders} orders this month`} />
+        <StatCard label="Net Revenue" value={formatMoney(stats.netRevenue)} sub={`After ${formatMoney(stats.totalCommissions)} commissions`} />
       </div>
 
-      {/* Charts */}
-      <div data-tour="admin-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+      {/* Attribution & Affiliate Stats */}
+      <div data-tour="biz-attribution" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard label="Conversion Rate" value={`${stats.conversionRate.toFixed(1)}%`} sub={`${stats.attributedOrders} of ${stats.totalOrders} attributed`} />
+        <StatCard label="Non-Attributed" value={stats.nonAttributedOrders} sub={formatMoney(stats.nonAttributedRevenue)} />
+        <StatCard label="Commissions Owed" value={formatMoney(stats.totalCommissions)} sub={`${formatMoney(stats.pendingPayouts)} pending payout`} />
+        <StatCard label="Active Affiliates" value={stats.activeAffiliates} sub={`${stats.activeCodes} active codes`} />
+      </div>
+
+      {/* Charts Row 1: Revenue & Orders Volume */}
+      <div data-tour="biz-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium text-gray-900">Revenue & Commissions</h2>
+          <h2 className="text-sm font-medium text-gray-900">Revenue & Order Volume</h2>
           <div className="flex gap-1 bg-gray-100 rounded p-0.5">
             <button onClick={() => setChartView('weekly')} className={`px-3 py-1 text-xs rounded ${chartView === 'weekly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Weekly</button>
             <button onClick={() => setChartView('monthly')} className={`px-3 py-1 text-xs rounded ${chartView === 'monthly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Monthly</button>
@@ -205,26 +211,29 @@ function OverviewTab() {
         {chartData.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-              <p className="text-xs text-gray-500 mb-2">Revenue</p>
+              <p className="text-xs text-gray-500 mb-2">Total Revenue</p>
               <ResponsiveContainer width="100%" height={240}>
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
                   <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
-                  <Area type="monotone" dataKey="revenue" stroke="#111827" fill="#f3f4f6" strokeWidth={2} />
+                  <Area type="monotone" dataKey="totalRevenue" stroke="#111827" fill="#f3f4f6" strokeWidth={2} name="Total Revenue" />
+                  <Area type="monotone" dataKey="attributedRevenue" stroke="#16a34a" fill="#dcfce7" strokeWidth={1.5} name="Attributed" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-2">Commissions Owed</p>
+              <p className="text-xs text-gray-500 mb-2">Order Volume</p>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
-                  <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
-                  <Bar dataKey="commissions" fill="#16a34a" radius={[3, 3, 0, 0]} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="attributedOrders" fill="#111827" stackId="orders" radius={[0, 0, 0, 0]} name="Attributed" />
+                  <Bar dataKey="nonAttributedOrders" fill="#d1d5db" stackId="orders" radius={[3, 3, 0, 0]} name="Non-Attributed" />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -234,68 +243,80 @@ function OverviewTab() {
         )}
       </div>
 
-      {/* Bottom: Top Affiliates + Recent Non-Attributed */}
-      <div className={`grid ${!selectedAffiliate && recentNonAttributed.length > 0 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} gap-6`}>
-        {topAffiliates.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-lg">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-medium text-gray-900">Top Affiliates</h2>
-            </div>
-            <DataTable
-              columns={topColumns}
-              data={rankedAffiliates}
-              footer={
-                <tfoot>
-                  <tr className="bg-gray-50 border-t border-gray-200">
-                    <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={2}>Total</td>
-                    <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{topAffiliates.reduce((s, a) => s + a.orders, 0)}</td>
-                    <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.revenue, 0))}</td>
-                    <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.commissions, 0))}</td>
-                  </tr>
-                </tfoot>
-              }
-            />
-          </div>
-        )}
-
-        {/* Recent Non-Attributed Orders */}
-        {!selectedAffiliate && recentNonAttributed.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-lg">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-sm font-medium text-gray-900">Recent Non-Attributed Orders</h2>
-              <span className="text-xs text-gray-400">{stats.nonAttributedCount || 0} total</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-left">
-                    <th className="px-4 py-2 text-gray-500 font-medium">Date</th>
-                    <th className="px-4 py-2 text-gray-500 font-medium">Customer</th>
-                    <th className="px-4 py-2 text-gray-500 font-medium">Items</th>
-                    <th className="px-4 py-2 text-gray-500 font-medium text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentNonAttributed.map((o: any) => (
-                    <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{formatDateTime(o.createdAt)}</td>
-                      <td className="px-4 py-2.5 text-gray-900">{o.customerFirstName}</td>
-                      <td className="px-4 py-2.5 text-gray-600 truncate max-w-[200px]">{o.itemsSummary}</td>
-                      <td className="px-4 py-2.5 text-gray-900 text-right font-medium">{formatMoney(o.orderTotal)}</td>
-                    </tr>
+      {/* Charts Row 2: Commissions & Attribution Breakdown */}
+      <div data-tour="biz-secondary-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h2 className="text-sm font-medium text-gray-900 mb-4">Commissions Over Time</h2>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
+                <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Commissions']} />
+                <Line type="monotone" dataKey="commissions" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-sm text-gray-400 text-center py-12">No data</div>
+          )}
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h2 className="text-sm font-medium text-gray-900 mb-4">Revenue Attribution</h2>
+          {pieData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                  {pieData.map((_entry, index) => (
+                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                   ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-gray-50 border-t border-gray-200">
-                    <td className="px-4 py-2.5 text-gray-900 font-semibold text-sm" colSpan={3}>Subtotal ({recentNonAttributed.length} shown)</td>
-                    <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{formatMoney(recentNonAttributed.reduce((s, o) => s + o.orderTotal, 0))}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        )}
+                </Pie>
+                <Tooltip formatter={(value: number) => formatMoney(value)} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-sm text-gray-400 text-center py-12">No revenue data</div>
+          )}
+        </div>
       </div>
+
+      {/* Recent Non-Attributed Orders */}
+      {recentNonAttributed.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-sm font-medium text-gray-900">Recent Non-Attributed Orders</h2>
+            <span className="text-xs text-gray-400">{stats.nonAttributedOrders} total</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left">
+                  <th className="px-4 py-2 text-gray-500 font-medium">Date</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium">Customer</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium">Items</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentNonAttributed.map((o: any) => (
+                  <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{formatDateTime(o.createdAt)}</td>
+                    <td className="px-4 py-2.5 text-gray-900">{o.customerFirstName}</td>
+                    <td className="px-4 py-2.5 text-gray-600 truncate max-w-[200px]">{o.itemsSummary}</td>
+                    <td className="px-4 py-2.5 text-gray-900 text-right font-medium">{formatMoney(o.orderTotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-gray-50 border-t border-gray-200">
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-sm" colSpan={3}>Subtotal ({recentNonAttributed.length} shown)</td>
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{formatMoney(recentNonAttributed.reduce((s, o) => s + o.orderTotal, 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -317,9 +338,21 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ name: '', email: '', password: '', defaultCommissionRate: '20' });
+  const [selectedAffiliate, setSelectedAffiliate] = useState<string>('');
+  const [perfStats, setPerfStats] = useState<any>(null);
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [topAffiliates, setTopAffiliates] = useState<any[]>([]);
+  const [chartView, setChartView] = useState<'weekly' | 'monthly'>('weekly');
 
-  useEffect(() => { loadAffiliates(); }, []);
+  useEffect(() => { loadAffiliates(); api.adminTopAffiliates().then(setTopAffiliates); }, []);
   async function loadAffiliates() { setAffiliates(await api.getAffiliates()); }
+
+  useEffect(() => {
+    const affId = selectedAffiliate || undefined;
+    Promise.all([api.adminStats(affId), api.adminWeekly(affId), api.adminMonthly(affId)])
+      .then(([s, w, m]) => { setPerfStats(s); setWeeklyData(w); setMonthlyData(m); });
+  }, [selectedAffiliate]);
 
   function openCreate() {
     setEditing(null);
@@ -373,9 +406,139 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
     },
   ];
 
+  const selectedName = selectedAffiliate ? affiliates.find((a) => a.id === selectedAffiliate)?.name || 'Affiliate' : 'All Affiliates';
+  const perfChartData = chartView === 'weekly' ? weeklyData : monthlyData;
+
+  const topColumns: Column[] = [
+    { key: '_rank', label: '#', defaultWidth: 50, sortable: false, render: (_r: any) => '' },
+    { key: 'name', label: 'Name', defaultWidth: 200, className: 'text-gray-900 font-medium' },
+    { key: 'orders', label: 'Orders', align: 'right', defaultWidth: 100, className: 'text-gray-600' },
+    { key: 'revenue', label: 'Revenue', align: 'right', defaultWidth: 130, render: (r: any) => formatMoney(r.revenue), className: 'text-gray-900' },
+    { key: 'commissions', label: 'Commissions', align: 'right', defaultWidth: 130, render: (r: any) => <span className="text-green-700 font-medium">{formatMoney(r.commissions)}</span> },
+  ];
+  const rankedAffiliates = topAffiliates.map((a, i) => ({ ...a, _rank: i + 1 }));
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      {/* Affiliate Performance Overview */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div data-tour="aff-filter" className="flex items-center gap-3">
+            <label className="text-sm text-gray-500">Filter by affiliate:</label>
+            <select value={selectedAffiliate} onChange={(e) => setSelectedAffiliate(e.target.value)}
+              className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[200px]">
+              <option value="">All Affiliates</option>
+              {affiliates.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            {selectedAffiliate && <button onClick={() => setSelectedAffiliate('')} className="text-xs text-gray-500 hover:text-gray-900">Clear</button>}
+          </div>
+        </div>
+
+        {selectedAffiliate && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 mb-4 text-sm text-blue-800">
+            Showing data for <span className="font-semibold">{selectedName}</span>
+          </div>
+        )}
+
+        {perfStats && (
+          <>
+            <div className="mb-2">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                {selectedAffiliate ? `${selectedName}'s Performance` : 'Affiliate Performance'}
+              </p>
+            </div>
+            <div data-tour="aff-perf-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <StatCard
+                label={selectedAffiliate ? 'Their Orders' : 'Attributed Orders'}
+                value={perfStats.attributedOrders}
+                sub={selectedAffiliate ? `${perfStats.totalOrders} total` : `${perfStats.totalOrders - perfStats.attributedOrders} without code`}
+              />
+              <StatCard
+                label={selectedAffiliate ? 'Their Revenue' : 'Affiliate Revenue'}
+                value={formatMoney(perfStats.totalRevenue)}
+                sub="From attributed orders"
+              />
+              <StatCard
+                label={selectedAffiliate ? 'Their Commissions' : 'Commissions Owed'}
+                value={formatMoney(perfStats.totalCommissions)}
+                sub={`${formatMoney(perfStats.pendingPayouts)} pending payout`}
+              />
+              {selectedAffiliate ? (
+                <StatCard label="Pending Payout" value={formatMoney(perfStats.pendingPayouts)} sub="Awaiting payment" />
+              ) : (
+                <StatCard label="Net Revenue" value={formatMoney((perfStats.totalRevenue || 0) - (perfStats.totalCommissions || 0))} sub="Revenue minus commissions" />
+              )}
+            </div>
+
+            {/* Charts */}
+            <div data-tour="aff-perf-charts" className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-medium text-gray-900">Revenue & Commissions</h2>
+                <div className="flex gap-1 bg-gray-100 rounded p-0.5">
+                  <button onClick={() => setChartView('weekly')} className={`px-3 py-1 text-xs rounded ${chartView === 'weekly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Weekly</button>
+                  <button onClick={() => setChartView('monthly')} className={`px-3 py-1 text-xs rounded ${chartView === 'monthly' ? 'bg-white text-gray-900 font-medium' : 'text-gray-500'}`}>Monthly</button>
+                </div>
+              </div>
+              {perfChartData.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-2">Revenue</p>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <AreaChart data={perfChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
+                        <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
+                        <Area type="monotone" dataKey="revenue" stroke="#111827" fill="#f3f4f6" strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-2">Commissions Owed</p>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={perfChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
+                        <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, '']} />
+                        <Bar dataKey="commissions" fill="#16a34a" radius={[3, 3, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-400 text-center py-8">No chart data available</div>
+              )}
+            </div>
+
+            {/* Top Affiliates */}
+            {!selectedAffiliate && topAffiliates.length > 0 && (
+              <div data-tour="aff-top-table" className="bg-white border border-gray-200 rounded-lg mb-6">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <h2 className="text-sm font-medium text-gray-900">Top Affiliates</h2>
+                </div>
+                <DataTable
+                  columns={topColumns}
+                  data={rankedAffiliates}
+                  footer={
+                    <tfoot>
+                      <tr className="bg-gray-50 border-t border-gray-200">
+                        <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={2}>Total</td>
+                        <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{topAffiliates.reduce((s, a) => s + a.orders, 0)}</td>
+                        <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.revenue, 0))}</td>
+                        <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(topAffiliates.reduce((s, a) => s + a.commissions, 0))}</td>
+                      </tr>
+                    </tfoot>
+                  }
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Affiliates CRUD Table */}
+      <div data-tour="aff-crud" className="flex justify-between items-center mb-4">
         <h2 className="text-sm font-medium text-gray-900">{affiliates.length} Affiliates</h2>
         <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Affiliate</button>
       </div>
@@ -500,7 +663,7 @@ function CodesTab() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-sm font-medium text-gray-900">{codes.length} Discount Codes</h2>
-        <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Code</button>
+        <button data-tour="codes-add" onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Code</button>
       </div>
 
       {showForm && (
@@ -535,7 +698,7 @@ function CodesTab() {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div data-tour="codes-table" className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <DataTable
           columns={columns}
           data={codes}
@@ -616,7 +779,7 @@ function OrdersTab() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-medium text-gray-900">All Orders ({data.total})</h2>
         <div className="flex items-center gap-3">
-          <div className="relative">
+          <div data-tour="orders-search" className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
@@ -631,7 +794,7 @@ function OrdersTab() {
               <button onClick={() => { setSearch(''); setSearchDebounced(''); setPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">&times;</button>
             )}
           </div>
-          <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1">
+          <div data-tour="orders-filter" className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1">
             {([['all', 'All'], ['yes', 'Attributed'], ['no', 'Not Attributed']] as const).map(([val, label]) => (
               <button
                 key={val}
@@ -644,7 +807,7 @@ function OrdersTab() {
           </div>
         </div>
       </div>
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div data-tour="orders-table" className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <DataTable
           columns={columns}
           data={data.orders}
@@ -718,7 +881,7 @@ function PayoutsTab() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-sm font-medium text-gray-900">{payouts.length} Payouts</h2>
-        <button onClick={() => setShowForm(true)} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Create Payout</button>
+        <button data-tour="payouts-create" onClick={() => setShowForm(true)} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Create Payout</button>
       </div>
 
       {showForm && (
@@ -749,7 +912,7 @@ function PayoutsTab() {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div data-tour="payouts-table" className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <DataTable
           columns={columns}
           data={payouts}
@@ -858,7 +1021,7 @@ function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-sm font-medium text-gray-900">{admins.length} Admins</h2>
-        <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Admin</button>
+        <button data-tour="admins-add" onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Admin</button>
       </div>
 
       {showModal && (
@@ -889,7 +1052,7 @@ function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div data-tour="admins-table" className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <DataTable
           columns={columns}
           data={admins}
@@ -941,6 +1104,322 @@ function Input({ label, value, onChange, type = 'text', required = false, placeh
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900"
         required={required} placeholder={placeholder} step={type === 'number' ? 'any' : undefined} />
+    </div>
+  );
+}
+
+// ============ LOGS TAB ============
+
+const ACTION_LABELS: Record<string, { label: string; color: string }> = {
+  LOGIN: { label: 'Login', color: 'bg-blue-100 text-blue-700' },
+  LOGIN_FAILED: { label: 'Login Failed', color: 'bg-red-100 text-red-700' },
+  CREATE_AFFILIATE: { label: 'Create Affiliate', color: 'bg-green-100 text-green-700' },
+  UPDATE_AFFILIATE: { label: 'Update Affiliate', color: 'bg-yellow-100 text-yellow-700' },
+  DELETE_AFFILIATE: { label: 'Delete Affiliate', color: 'bg-red-100 text-red-700' },
+  CREATE_CODE: { label: 'Create Code', color: 'bg-green-100 text-green-700' },
+  UPDATE_CODE: { label: 'Update Code', color: 'bg-yellow-100 text-yellow-700' },
+  DELETE_CODE: { label: 'Delete Code', color: 'bg-red-100 text-red-700' },
+  DELETE_ORDER: { label: 'Delete Order', color: 'bg-red-100 text-red-700' },
+  CREATE_PAYOUT: { label: 'Create Payout', color: 'bg-green-100 text-green-700' },
+  UPDATE_PAYOUT: { label: 'Update Payout', color: 'bg-yellow-100 text-yellow-700' },
+  CREATE_ADMIN: { label: 'Create Admin', color: 'bg-purple-100 text-purple-700' },
+  UPDATE_ADMIN: { label: 'Update Admin', color: 'bg-purple-100 text-purple-700' },
+  DELETE_ADMIN: { label: 'Delete Admin', color: 'bg-red-100 text-red-700' },
+  VIEW_AS: { label: 'View As', color: 'bg-indigo-100 text-indigo-700' },
+};
+
+const LEVEL_STYLES: Record<string, string> = {
+  INFO: 'bg-blue-100 text-blue-700',
+  WARN: 'bg-yellow-100 text-yellow-700',
+  ERROR: 'bg-red-100 text-red-700',
+};
+
+function LogsTab() {
+  const [subTab, setSubTab] = useState<'activity' | 'system'>('activity');
+
+  return (
+    <div>
+      <div data-tour="logs-subtabs" className="flex gap-2 mb-4">
+        <button onClick={() => setSubTab('activity')}
+          className={`px-3 py-1.5 text-sm rounded-md ${subTab === 'activity' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:text-gray-900'}`}>
+          Activity Logs
+        </button>
+        <button onClick={() => setSubTab('system')}
+          className={`px-3 py-1.5 text-sm rounded-md ${subTab === 'system' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:text-gray-900'}`}>
+          System Logs
+        </button>
+      </div>
+      <div data-tour="logs-content">
+        {subTab === 'activity' ? <ActivityLogsPanel /> : <SystemLogsPanel />}
+      </div>
+    </div>
+  );
+}
+
+function ActivityLogsPanel() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [actionFilter, setActionFilter] = useState('');
+  const [actions, setActions] = useState<string[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const limit = 30;
+
+  useEffect(() => {
+    api.getAuditActions().then(setActions);
+    api.getAuditStats().then(setStats);
+  }, []);
+
+  useEffect(() => { loadLogs(); }, [page, actionFilter, search]);
+
+  async function loadLogs() {
+    const params: any = { page: String(page), limit: String(limit) };
+    if (actionFilter) params.action = actionFilter;
+    if (search) params.search = search;
+    const data = await api.getAuditLogs(params);
+    setLogs(data.logs);
+    setTotal(data.total);
+  }
+
+  const totalPages = Math.ceil(total / limit);
+
+  return (
+    <div className="space-y-4">
+      {/* Stats cards */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Actions Today</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalToday}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Actions This Week</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalWeek}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Logins Today</p>
+            <p className="text-2xl font-bold text-blue-600 mt-1">{stats.loginsToday}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">System Errors Today</p>
+            <p className={`text-2xl font-bold mt-1 ${stats.errorsToday > 0 ? 'text-red-600' : 'text-green-600'}`}>{stats.errorsToday}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
+            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search by user, action, details..."
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900" />
+          </div>
+          <div className="min-w-[180px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Action Type</label>
+            <select value={actionFilter} onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900 bg-white">
+              <option value="">All Actions</option>
+              {actions.map(a => (
+                <option key={a} value={a}>{ACTION_LABELS[a]?.label || a}</option>
+              ))}
+            </select>
+          </div>
+          <button onClick={() => { setSearch(''); setActionFilter(''); setPage(1); }}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900">Clear</button>
+        </div>
+      </div>
+
+      {/* Log entries */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="divide-y divide-gray-100">
+          {logs.length === 0 && (
+            <div className="p-8 text-center text-gray-400 text-sm">No activity logs found</div>
+          )}
+          {logs.map((log) => {
+            const actionInfo = ACTION_LABELS[log.action] || { label: log.action, color: 'bg-gray-100 text-gray-700' };
+            const details = log.details ? JSON.parse(log.details) : null;
+            const isExpanded = expandedId === log.id;
+
+            return (
+              <div key={log.id} className="px-4 py-3 hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : log.id)}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${actionInfo.color}`}>
+                      {actionInfo.label}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm text-gray-900 font-medium">
+                        {log.userName || log.userEmail || 'System'}
+                      </span>
+                      {log.userRole && (
+                        <span className="text-xs text-gray-400 ml-1.5">({log.userRole})</span>
+                      )}
+                      {log.entity && (
+                        <span className="text-xs text-gray-500 ml-2">
+                          on {log.entity}{log.entityId ? ` #${log.entityId.substring(0, 8)}` : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {log.ipAddress && (
+                      <span className="text-xs text-gray-400 hidden md:block">{log.ipAddress}</span>
+                    )}
+                    <span className="text-xs text-gray-400 whitespace-nowrap">{formatDateTime(log.createdAt)}</span>
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                {isExpanded && details && (
+                  <div className="mt-2 ml-0 p-3 bg-gray-50 rounded text-xs font-mono text-gray-600 overflow-x-auto">
+                    <pre className="whitespace-pre-wrap">{JSON.stringify(details, null, 2)}</pre>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-500">
+            Showing {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} of {total}
+          </span>
+          <div className="flex gap-1">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-40 hover:bg-gray-50">Prev</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-40 hover:bg-gray-50">Next</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SystemLogsPanel() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [levelFilter, setLevelFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const limit = 30;
+
+  useEffect(() => { loadLogs(); }, [page, levelFilter, sourceFilter, search]);
+
+  async function loadLogs() {
+    const params: any = { page: String(page), limit: String(limit) };
+    if (levelFilter) params.level = levelFilter;
+    if (sourceFilter) params.source = sourceFilter;
+    if (search) params.search = search;
+    const data = await api.getSystemLogs(params);
+    setLogs(data.logs);
+    setTotal(data.total);
+  }
+
+  const totalPages = Math.ceil(total / limit);
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
+            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search messages, sources..."
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900" />
+          </div>
+          <div className="min-w-[130px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Level</label>
+            <select value={levelFilter} onChange={(e) => { setLevelFilter(e.target.value); setPage(1); }}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900 bg-white">
+              <option value="">All Levels</option>
+              <option value="INFO">Info</option>
+              <option value="WARN">Warning</option>
+              <option value="ERROR">Error</option>
+            </select>
+          </div>
+          <div className="min-w-[130px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Source</label>
+            <select value={sourceFilter} onChange={(e) => { setSourceFilter(e.target.value); setPage(1); }}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900 bg-white">
+              <option value="">All Sources</option>
+              <option value="WEBHOOK">Webhook</option>
+              <option value="API">API</option>
+              <option value="AUTH">Auth</option>
+              <option value="SYSTEM">System</option>
+            </select>
+          </div>
+          <button onClick={() => { setSearch(''); setLevelFilter(''); setSourceFilter(''); setPage(1); }}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900">Clear</button>
+        </div>
+      </div>
+
+      {/* Log entries */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="divide-y divide-gray-100">
+          {logs.length === 0 && (
+            <div className="p-8 text-center text-gray-400 text-sm">No system logs found</div>
+          )}
+          {logs.map((log) => {
+            const levelStyle = LEVEL_STYLES[log.level] || 'bg-gray-100 text-gray-700';
+            const details = log.details ? JSON.parse(log.details) : null;
+            const isExpanded = expandedId === log.id;
+
+            return (
+              <div key={log.id} className="px-4 py-3 hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : log.id)}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${levelStyle}`}>
+                      {log.level}
+                    </span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">
+                      {log.source}
+                    </span>
+                    <span className="text-sm text-gray-900 truncate">{log.message}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-gray-400 whitespace-nowrap">{formatDateTime(log.createdAt)}</span>
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                {isExpanded && details && (
+                  <div className="mt-2 ml-0 p-3 bg-gray-50 rounded text-xs font-mono text-gray-600 overflow-x-auto">
+                    <pre className="whitespace-pre-wrap">{JSON.stringify(details, null, 2)}</pre>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-500">
+            Showing {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} of {total}
+          </span>
+          <div className="flex gap-1">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-40 hover:bg-gray-50">Prev</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-40 hover:bg-gray-50">Next</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
