@@ -302,6 +302,7 @@ function BusinessOverviewTab() {
               <thead>
                 <tr className="border-b border-gray-100 text-left">
                   <th className="px-4 py-2 text-gray-500 font-medium">Store</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium">Source</th>
                   <th className="px-4 py-2 text-gray-500 font-medium text-right">Orders</th>
                   <th className="px-4 py-2 text-gray-500 font-medium text-right">Revenue</th>
                   <th className="px-4 py-2 text-gray-500 font-medium text-right">Commissions</th>
@@ -309,8 +310,9 @@ function BusinessOverviewTab() {
               </thead>
               <tbody>
                 {topStores.map((s: any) => (
-                  <tr key={s.source} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="px-4 py-2.5 text-gray-900 font-medium capitalize">{s.source}</td>
+                  <tr key={s.name} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-2.5 text-gray-900 font-medium">{s.name}</td>
+                    <td className="px-4 py-2.5 text-gray-500 capitalize">{s.source}</td>
                     <td className="px-4 py-2.5 text-gray-600 text-right">{s.orders}</td>
                     <td className="px-4 py-2.5 text-gray-900 text-right font-medium">{formatMoney(s.revenue)}</td>
                     <td className="px-4 py-2.5 text-green-700 text-right font-medium">{formatMoney(s.commissions)}</td>
@@ -319,7 +321,7 @@ function BusinessOverviewTab() {
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 border-t border-gray-200">
-                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-sm">Total</td>
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-sm" colSpan={2}>Total</td>
                   <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{topStores.reduce((s, st) => s + st.orders, 0)}</td>
                   <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{formatMoney(topStores.reduce((s, st) => s + st.revenue, 0))}</td>
                   <td className="px-4 py-2.5 text-green-700 font-semibold text-right text-sm">{formatMoney(topStores.reduce((s, st) => s + st.commissions, 0))}</td>
@@ -907,9 +909,12 @@ function OrdersTab() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [storeNameFilter, setStoreNameFilter] = useState('');
+  const [storeNameDebounced, setStoreNameDebounced] = useState('');
   const [currencyFilter, setCurrencyFilter] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const searchTimer = useRef<any>(null);
+  const storeNameTimer = useRef<any>(null);
 
   function handleSearch(val: string) {
     setSearch(val);
@@ -920,8 +925,17 @@ function OrdersTab() {
     }, 400);
   }
 
-  useEffect(() => { setPage(1); }, [filter, startDate, endDate, sourceFilter, currencyFilter]);
-  useEffect(() => { loadOrders(); }, [page, filter, searchDebounced, startDate, endDate, sourceFilter, currencyFilter]);
+  function handleStoreNameFilter(val: string) {
+    setStoreNameFilter(val);
+    if (storeNameTimer.current) clearTimeout(storeNameTimer.current);
+    storeNameTimer.current = setTimeout(() => {
+      setStoreNameDebounced(val);
+      setPage(1);
+    }, 400);
+  }
+
+  useEffect(() => { setPage(1); }, [filter, startDate, endDate, sourceFilter, storeNameDebounced, currencyFilter]);
+  useEffect(() => { loadOrders(); }, [page, filter, searchDebounced, startDate, endDate, sourceFilter, storeNameDebounced, currencyFilter]);
 
   function loadOrders() {
     const params: any = { page: page.toString(), limit: '50' };
@@ -931,6 +945,7 @@ function OrdersTab() {
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
     if (sourceFilter) params.source = sourceFilter;
+    if (storeNameDebounced.trim()) params.storeName = storeNameDebounced.trim();
     if (currencyFilter) params.currency = currencyFilter;
     api.getOrders(params).then((d) => { setData(d); setSelectedIds(new Set()); });
   }
@@ -959,11 +974,11 @@ function OrdersTab() {
   }
 
   function handleDownloadCSV() {
-    const headers = ['Date', 'Customer', 'Items', 'Code', 'Affiliate', 'Source', 'Currency', 'Total', 'Commission', 'Attributed'];
+    const headers = ['Date', 'Customer', 'Items', 'Code', 'Affiliate', 'Source', 'Store', 'Currency', 'Total', 'Commission', 'Attributed'];
     const rows = data.orders.map(o => [
       formatDateTime(o.createdAt), o.customerFirstName, o.itemsSummary,
       o.discountCode?.code || '', o.discountCode?.affiliate?.name || '',
-      o.source, o.currency || 'USD', o.orderTotal.toFixed(2), o.commissionEarned.toFixed(2),
+      o.source, o.storeName || '', o.currency || 'USD', o.orderTotal.toFixed(2), o.commissionEarned.toFixed(2),
       o.attributed ? 'Yes' : 'No',
     ]);
     downloadCSV(rows, headers, `orders-${new Date().toISOString().split('T')[0]}.csv`);
@@ -982,7 +997,8 @@ function OrdersTab() {
     { key: 'itemsSummary', label: 'Items', defaultWidth: 220, className: 'text-gray-600' },
     { key: 'discountCode.code', label: 'Code', defaultWidth: 110, render: (r: any) => <span className="font-mono text-xs text-gray-500">{r.discountCode?.code || '—'}</span> },
     { key: 'discountCode.affiliate.name', label: 'Affiliate', defaultWidth: 130, render: (r: any) => r.discountCode?.affiliate?.name || '—', className: 'text-gray-600' },
-    { key: 'source', label: 'Store', defaultWidth: 90, render: (r: any) => <span className="capitalize text-gray-500">{r.source}</span> },
+    { key: 'source', label: 'Source', defaultWidth: 90, render: (r: any) => <span className="capitalize text-gray-500">{r.source}</span> },
+    { key: 'storeName', label: 'Store', defaultWidth: 130, render: (r: any) => <span className="text-gray-500 text-xs">{r.storeName || '—'}</span> },
     { key: 'currency', label: 'Currency', defaultWidth: 80, render: (r: any) => <span className="text-gray-500 text-xs">{r.currency || 'USD'}</span> },
     { key: 'orderTotal', label: 'Total', align: 'right', defaultWidth: 110, render: (r: any) => formatMoney(r.orderTotal), className: 'text-gray-900' },
     { key: 'commissionEarned', label: 'Commission', align: 'right', defaultWidth: 110, render: (r: any) => <span className="text-green-700 font-medium">{formatMoney(r.commissionEarned)}</span> },
@@ -1038,11 +1054,13 @@ function OrdersTab() {
             className="text-sm border border-gray-300 rounded px-2 py-1" />
           <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
             className="text-sm border border-gray-300 rounded px-2 py-1">
-            <option value="">All Stores</option>
+            <option value="">All Sources</option>
             <option value="shopify">Shopify</option>
             <option value="wordpress">WordPress</option>
             <option value="stripe">Stripe</option>
           </select>
+          <input type="text" value={storeNameFilter} onChange={(e) => handleStoreNameFilter(e.target.value)}
+            placeholder="Filter by store name..." className="text-sm border border-gray-300 rounded px-2 py-1 w-40" />
           <select value={currencyFilter} onChange={(e) => setCurrencyFilter(e.target.value)}
             className="text-sm border border-gray-300 rounded px-2 py-1">
             <option value="">All Currencies</option>
@@ -1051,8 +1069,8 @@ function OrdersTab() {
             <option value="EUR">EUR</option>
             <option value="GBP">GBP</option>
           </select>
-          {(startDate || endDate || sourceFilter || currencyFilter) && (
-            <button onClick={() => { setStartDate(''); setEndDate(''); setSourceFilter(''); setCurrencyFilter(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear all</button>
+          {(startDate || endDate || sourceFilter || storeNameFilter || currencyFilter) && (
+            <button onClick={() => { setStartDate(''); setEndDate(''); setSourceFilter(''); setStoreNameFilter(''); setStoreNameDebounced(''); setCurrencyFilter(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear all</button>
           )}
         </div>
         <div className="flex items-center gap-2">

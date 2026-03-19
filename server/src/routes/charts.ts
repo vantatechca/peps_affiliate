@@ -410,19 +410,33 @@ router.get('/admin/business/top-stores', async (req: Request, res: Response) => 
     }
 
     const orders = await prisma.order.groupBy({
-      by: ['source'],
+      by: ['storeName', 'source'],
       where,
       _sum: { orderTotal: true, commissionEarned: true },
       _count: true,
     });
 
-    const stores = orders
-      .map((g) => ({
-        source: g.source,
-        orders: g._count,
-        revenue: g._sum.orderTotal || 0,
-        commissions: g._sum.commissionEarned || 0,
-      }))
+    // Aggregate by storeName (fall back to source if storeName is null)
+    const storeMap = new Map<string, { name: string; source: string; orders: number; revenue: number; commissions: number }>();
+    for (const g of orders) {
+      const name = g.storeName || g.source;
+      const existing = storeMap.get(name);
+      if (existing) {
+        existing.orders += g._count;
+        existing.revenue += g._sum.orderTotal || 0;
+        existing.commissions += g._sum.commissionEarned || 0;
+      } else {
+        storeMap.set(name, {
+          name,
+          source: g.source,
+          orders: g._count,
+          revenue: g._sum.orderTotal || 0,
+          commissions: g._sum.commissionEarned || 0,
+        });
+      }
+    }
+
+    const stores = Array.from(storeMap.values())
       .sort((a, b) => b.revenue - a.revenue);
 
     res.json(stores);

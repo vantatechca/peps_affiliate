@@ -182,6 +182,7 @@ async function main() {
         commissionEarned: commission,
         attributed: true,
         source: o.daysAgo % 3 === 0 ? 'wordpress' : 'shopify',
+        storeName: o.daysAgo % 3 === 0 ? 'WP Health Hub' : (o.daysAgo % 2 === 0 ? 'Peptide Pro Shop' : 'Bio Wellness Store'),
         createdAt: date,
       },
     });
@@ -216,6 +217,7 @@ async function main() {
         commissionEarned: commission,
         attributed: true,
         source: o.daysAgo % 2 === 0 ? 'shopify' : 'wordpress',
+        storeName: o.daysAgo % 2 === 0 ? 'Peptide Pro Shop' : 'WP Health Hub',
         createdAt: date,
       },
     });
@@ -244,6 +246,7 @@ async function main() {
         commissionEarned: commission,
         attributed: true,
         source: 'shopify',
+        storeName: 'Bio Wellness Store',
         createdAt: date,
       },
     });
@@ -269,6 +272,7 @@ async function main() {
         commissionEarned: commission,
         attributed: true,
         source: 'wordpress',
+        storeName: 'WP Health Hub',
         createdAt: date,
       },
     });
