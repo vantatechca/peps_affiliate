@@ -82,7 +82,7 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="px-6 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-lg font-semibold text-gray-900">
               {isSuperAdmin ? 'Super Admin Panel' : 'Admin Panel'}
@@ -95,7 +95,7 @@ export default function AdminPanel() {
           </div>
         </div>
       </header>
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="px-6 py-6">
         <div data-tour="admin-tabs" className="flex gap-1 mb-6 bg-white border border-gray-200 rounded-lg p-1 w-fit">
           {tabs.map((t) => (
             <button key={t} onClick={() => setTab(t)}
@@ -128,20 +128,30 @@ function BusinessOverviewTab() {
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [chartView, setChartView] = useState<'weekly' | 'monthly'>('weekly');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [recentNonAttributed, setRecentNonAttributed] = useState<any[]>([]);
+  const [topStores, setTopStores] = useState<any[]>([]);
 
   useEffect(() => {
     api.getOrders({ limit: '10', attributed: 'false' }).then((d) => setRecentNonAttributed(d.orders));
   }, []);
 
-  useEffect(() => { loadData(); }, [sourceFilter]);
+  useEffect(() => { loadData(); }, [sourceFilter, startDate, endDate]);
 
   async function loadData() {
     const src = sourceFilter || undefined;
-    const [s, w, m] = await Promise.all([
-      api.businessStats(src), api.businessWeekly(src), api.businessMonthly(src),
+    const statsParams: any = {};
+    if (src) statsParams.source = src;
+    if (startDate) statsParams.startDate = startDate;
+    if (endDate) statsParams.endDate = endDate;
+    const storeParams: any = {};
+    if (startDate) storeParams.startDate = startDate;
+    if (endDate) storeParams.endDate = endDate;
+    const [s, w, m, stores] = await Promise.all([
+      api.businessStats(statsParams), api.businessWeekly(src), api.businessMonthly(src), api.topStores(storeParams),
     ]);
-    setStats(s); setWeeklyData(w); setMonthlyData(m);
+    setStats(s); setWeeklyData(w); setMonthlyData(m); setTopStores(stores);
   }
 
   function handleDownloadPDF() {
@@ -160,8 +170,8 @@ function BusinessOverviewTab() {
   return (
     <div>
       {/* Header with filters */}
-      <div className="flex items-center justify-between mb-4">
-        <div data-tour="biz-source-filter" className="flex items-center gap-3">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div data-tour="biz-source-filter" className="flex items-center gap-3 flex-wrap">
           <label className="text-sm text-gray-500">Source:</label>
           <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
             className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[140px]">
@@ -170,7 +180,13 @@ function BusinessOverviewTab() {
             <option value="wordpress">WordPress</option>
             <option value="stripe">Stripe</option>
           </select>
-          {sourceFilter && <button onClick={() => setSourceFilter('')} className="text-xs text-gray-500 hover:text-gray-900">Clear</button>}
+          <label className="text-xs text-gray-500">From:</label>
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-2 py-1.5" />
+          <label className="text-xs text-gray-500">To:</label>
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-2 py-1.5" />
+          {(sourceFilter || startDate || endDate) && <button onClick={() => { setSourceFilter(''); setStartDate(''); setEndDate(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear all</button>}
         </div>
         <button data-tour="admin-pdf" onClick={handleDownloadPDF} className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">Download PDF Report</button>
       </div>
@@ -274,6 +290,45 @@ function BusinessOverviewTab() {
           )}
         </div>
       </div>
+
+      {/* Top Performing Stores */}
+      {topStores.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg mb-6">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <h2 className="text-sm font-medium text-gray-900">Top Performing Stores</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left">
+                  <th className="px-4 py-2 text-gray-500 font-medium">Store</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium text-right">Orders</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium text-right">Revenue</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium text-right">Commissions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topStores.map((s: any) => (
+                  <tr key={s.source} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-2.5 text-gray-900 font-medium capitalize">{s.source}</td>
+                    <td className="px-4 py-2.5 text-gray-600 text-right">{s.orders}</td>
+                    <td className="px-4 py-2.5 text-gray-900 text-right font-medium">{formatMoney(s.revenue)}</td>
+                    <td className="px-4 py-2.5 text-green-700 text-right font-medium">{formatMoney(s.commissions)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-gray-50 border-t border-gray-200">
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-sm">Total</td>
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{topStores.reduce((s, st) => s + st.orders, 0)}</td>
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{formatMoney(topStores.reduce((s, st) => s + st.revenue, 0))}</td>
+                  <td className="px-4 py-2.5 text-green-700 font-semibold text-right text-sm">{formatMoney(topStores.reduce((s, st) => s + st.commissions, 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Recent Non-Attributed Orders */}
       {recentNonAttributed.length > 0 && (
@@ -405,7 +460,7 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
     const rows = affiliates.map(a => [
       a.name, a.email, a.passwordPlain || '',
       (a.defaultCommissionRate * 100).toFixed(0) + '%',
-      (a.discountCodes?.length || 0).toString(),
+      (a.discountCodes || []).map((c: any) => c.code).join('; ') || 'None',
       a.active ? 'Active' : 'Inactive',
       formatDate(a.createdAt),
     ]);
@@ -424,7 +479,11 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
     { key: 'email', label: 'Email', defaultWidth: 200, className: 'text-gray-600' },
     { key: 'passwordPlain', label: 'Password', defaultWidth: 140, render: (r: any) => <PasswordCell password={r.passwordPlain} /> },
     { key: 'defaultCommissionRate', label: 'Commission', defaultWidth: 110, render: (r: any) => formatPct(r.defaultCommissionRate), className: 'text-gray-600' },
-    { key: '_codes', label: 'Codes', defaultWidth: 80, render: (r: any) => r.discountCodes?.length || 0, className: 'text-gray-600' },
+    { key: '_codes', label: 'Codes', defaultWidth: 180, render: (r: any) => {
+      const codes = r.discountCodes || [];
+      if (codes.length === 0) return <span className="text-gray-400">None</span>;
+      return <span className="font-mono text-xs text-gray-600">{codes.map((c: any) => c.code).join(', ')}</span>;
+    } },
     { key: 'active', label: 'Status', defaultWidth: 90, render: (r: any) => <span className={`text-xs font-medium ${r.active ? 'text-green-700' : 'text-gray-400'}`}>{r.active ? 'Active' : 'Inactive'}</span> },
     {
       key: '_actions', label: 'Actions', defaultWidth: 220, sortable: false,
@@ -847,6 +906,8 @@ function OrdersTab() {
   const [searchDebounced, setSearchDebounced] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [currencyFilter, setCurrencyFilter] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const searchTimer = useRef<any>(null);
 
@@ -859,8 +920,8 @@ function OrdersTab() {
     }, 400);
   }
 
-  useEffect(() => { setPage(1); }, [filter, startDate, endDate]);
-  useEffect(() => { loadOrders(); }, [page, filter, searchDebounced, startDate, endDate]);
+  useEffect(() => { setPage(1); }, [filter, startDate, endDate, sourceFilter, currencyFilter]);
+  useEffect(() => { loadOrders(); }, [page, filter, searchDebounced, startDate, endDate, sourceFilter, currencyFilter]);
 
   function loadOrders() {
     const params: any = { page: page.toString(), limit: '50' };
@@ -869,6 +930,8 @@ function OrdersTab() {
     if (searchDebounced.trim()) params.search = searchDebounced.trim();
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
+    if (sourceFilter) params.source = sourceFilter;
+    if (currencyFilter) params.currency = currencyFilter;
     api.getOrders(params).then((d) => { setData(d); setSelectedIds(new Set()); });
   }
 
@@ -896,11 +959,11 @@ function OrdersTab() {
   }
 
   function handleDownloadCSV() {
-    const headers = ['Date', 'Customer', 'Items', 'Code', 'Affiliate', 'Source', 'Total', 'Commission', 'Attributed'];
+    const headers = ['Date', 'Customer', 'Items', 'Code', 'Affiliate', 'Source', 'Currency', 'Total', 'Commission', 'Attributed'];
     const rows = data.orders.map(o => [
       formatDateTime(o.createdAt), o.customerFirstName, o.itemsSummary,
       o.discountCode?.code || '', o.discountCode?.affiliate?.name || '',
-      o.source, o.orderTotal.toFixed(2), o.commissionEarned.toFixed(2),
+      o.source, o.currency || 'USD', o.orderTotal.toFixed(2), o.commissionEarned.toFixed(2),
       o.attributed ? 'Yes' : 'No',
     ]);
     downloadCSV(rows, headers, `orders-${new Date().toISOString().split('T')[0]}.csv`);
@@ -919,7 +982,8 @@ function OrdersTab() {
     { key: 'itemsSummary', label: 'Items', defaultWidth: 220, className: 'text-gray-600' },
     { key: 'discountCode.code', label: 'Code', defaultWidth: 110, render: (r: any) => <span className="font-mono text-xs text-gray-500">{r.discountCode?.code || '—'}</span> },
     { key: 'discountCode.affiliate.name', label: 'Affiliate', defaultWidth: 130, render: (r: any) => r.discountCode?.affiliate?.name || '—', className: 'text-gray-600' },
-    { key: 'source', label: 'Source', defaultWidth: 90, render: (r: any) => <span className="capitalize text-gray-500">{r.source}</span> },
+    { key: 'source', label: 'Store', defaultWidth: 90, render: (r: any) => <span className="capitalize text-gray-500">{r.source}</span> },
+    { key: 'currency', label: 'Currency', defaultWidth: 80, render: (r: any) => <span className="text-gray-500 text-xs">{r.currency || 'USD'}</span> },
     { key: 'orderTotal', label: 'Total', align: 'right', defaultWidth: 110, render: (r: any) => formatMoney(r.orderTotal), className: 'text-gray-900' },
     { key: 'commissionEarned', label: 'Commission', align: 'right', defaultWidth: 110, render: (r: any) => <span className="text-green-700 font-medium">{formatMoney(r.commissionEarned)}</span> },
     { key: 'attributed', label: 'Attributed', defaultWidth: 90, render: (r: any) => <span className={`text-xs ${r.attributed ? 'text-green-700' : 'text-gray-400'}`}>{r.attributed ? 'Yes' : 'No'}</span> },
@@ -963,17 +1027,32 @@ function OrdersTab() {
         </div>
       </div>
 
-      {/* Date Range Filter + Actions */}
+      {/* Date Range + Source/Currency Filters + Actions */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <label className="text-xs text-gray-500">From:</label>
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
             className="text-sm border border-gray-300 rounded px-2 py-1" />
           <label className="text-xs text-gray-500">To:</label>
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
             className="text-sm border border-gray-300 rounded px-2 py-1" />
-          {(startDate || endDate) && (
-            <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear dates</button>
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-2 py-1">
+            <option value="">All Stores</option>
+            <option value="shopify">Shopify</option>
+            <option value="wordpress">WordPress</option>
+            <option value="stripe">Stripe</option>
+          </select>
+          <select value={currencyFilter} onChange={(e) => setCurrencyFilter(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-2 py-1">
+            <option value="">All Currencies</option>
+            <option value="USD">USD</option>
+            <option value="CAD">CAD</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+          </select>
+          {(startDate || endDate || sourceFilter || currencyFilter) && (
+            <button onClick={() => { setStartDate(''); setEndDate(''); setSourceFilter(''); setCurrencyFilter(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear all</button>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -1003,7 +1082,7 @@ function OrdersTab() {
                   <input type="checkbox" checked={selectedIds.size === data.orders.length && data.orders.length > 0}
                     onChange={toggleSelectAll} className="rounded border-gray-300" />
                 </td>
-                <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={6}>Total ({data.orders.length} orders on this page)</td>
+                <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={7}>Total ({data.orders.length} orders on this page)</td>
                 <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(data.orders.reduce((s, o) => s + o.orderTotal, 0))}</td>
                 <td className="px-4 py-3 text-green-700 font-semibold text-right text-sm">{formatMoney(data.orders.reduce((s, o) => s + o.commissionEarned, 0))}</td>
                 <td className="px-4 py-3" colSpan={2}></td>

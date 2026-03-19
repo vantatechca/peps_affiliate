@@ -63,6 +63,7 @@ model Order {
   commissionEarned  Float         @default(0)
   attributed        Boolean       @default(false)
   source            String        @default("shopify")
+  currency          String        @default("USD")
   createdAt         DateTime      @default(now())
 
   @@index([discountCodeId])
