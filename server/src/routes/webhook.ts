@@ -28,13 +28,34 @@ router.post('/order-paid', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'customer_first_name and order_total are required' });
     }
 
-    // Duplicate detection — only by external_order_id
+    // Duplicate detection
     if (external_order_id) {
-      const existing = await prisma.order.findUnique({
+      const existing = await prisma.order.findFirst({
         where: { externalOrderId: external_order_id },
       });
       if (existing) {
         console.log(`⏩ Duplicate order skipped (same external_id): ${external_order_id}`);
+        return res.json({
+          success: true,
+          order_id: existing.id,
+          attributed: existing.attributed,
+          commission_earned: existing.commissionEarned,
+          duplicate: true,
+        });
+      }
+    } else {
+      // Fallback: check for same customer + amount within 5 minutes
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const existing = await prisma.order.findFirst({
+        where: {
+          customerFirstName: customer_first_name,
+          orderTotal: parseFloat(order_total),
+          source,
+          createdAt: { gte: fiveMinAgo },
+        },
+      });
+      if (existing) {
+        console.log(`⏩ Duplicate order skipped (same customer+amount within 5min): ${existing.id}`);
         return res.json({
           success: true,
           order_id: existing.id,
@@ -123,37 +144,20 @@ router.post('/order-paid', async (req: Request, res: Response) => {
     }
 
     // Create order record
-    let order;
-    try {
-      order = await prisma.order.create({
-        data: {
-          externalOrderId: external_order_id || null,
-          discountCodeId: discountCodeRecord?.id || null,
-          customerFirstName: customer_first_name,
-          itemsSummary: items_summary || '',
-          orderTotal: parseFloat(order_total),
-          commissionEarned,
-          attributed,
-          source,
-          storeName: source_store || store_name || null,
-          currency: currency.toUpperCase(),
-        },
-      });
-    } catch (err: any) {
-      // Handle race condition: unique constraint on externalOrderId
-      if (err.code === 'P2002' && external_order_id) {
-        const existing = await prisma.order.findUnique({ where: { externalOrderId: external_order_id } });
-        console.log(`⏩ Duplicate order caught by DB constraint: ${external_order_id}`);
-        return res.json({
-          success: true,
-          order_id: existing?.id,
-          attributed: existing?.attributed,
-          commission_earned: existing?.commissionEarned,
-          duplicate: true,
-        });
-      }
-      throw err;
-    }
+    const order = await prisma.order.create({
+      data: {
+        externalOrderId: external_order_id || null,
+        discountCodeId: discountCodeRecord?.id || null,
+        customerFirstName: customer_first_name,
+        itemsSummary: items_summary || '',
+        orderTotal: parseFloat(order_total),
+        commissionEarned,
+        attributed,
+        source,
+        storeName: source_store || store_name || null,
+        currency: currency.toUpperCase(),
+      },
+    });
 
     console.log(
       `✅ Order saved: ${order.id} | Code: ${discount_code || 'none'} | Attributed: ${attributed} | Commission: $${commissionEarned}`
