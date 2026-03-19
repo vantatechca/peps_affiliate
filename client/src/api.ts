@@ -109,6 +109,13 @@ export const api = {
     const q = qs.toString();
     return request(`/charts/admin/business/top-stores${q ? `?${q}` : ''}`);
   },
+  sourceDistribution: (params?: { startDate?: string; endDate?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.startDate) qs.set('startDate', params.startDate);
+    if (params?.endDate) qs.set('endDate', params.endDate);
+    const q = qs.toString();
+    return request(`/charts/admin/business/source-distribution${q ? `?${q}` : ''}`);
+  },
 
   adminStats: (affiliateId?: string) =>
     request(`/admin/stats${affiliateId ? `?affiliateId=${affiliateId}` : ''}`),
