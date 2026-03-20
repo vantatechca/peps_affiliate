@@ -254,4 +254,47 @@ router.get('/all-users', async (_req: Request, res: Response) => {
   }
 });
 
+// ============ ORDER EDITING ============
+
+// PATCH /api/super/orders/:id  — edit currency, source, storeName
+router.patch('/orders/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { currency, source, storeName } = req.body;
+
+    const data: any = {};
+    if (currency !== undefined) data.currency = currency;
+    if (source !== undefined) data.source = source;
+    if (storeName !== undefined) data.storeName = storeName || null;
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    const order = await prisma.order.update({
+      where: { id },
+      data,
+      include: {
+        discountCode: {
+          include: { affiliate: { select: { id: true, name: true } } },
+        },
+      },
+    });
+
+    logAudit({
+      ...auditFromReq(req),
+      action: 'EDIT_ORDER',
+      entity: 'Order',
+      entityId: id,
+      details: { changes: data, externalOrderId: order.externalOrderId },
+    });
+
+    res.json(order);
+  } catch (error) {
+    console.error('Edit order error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Edit order error', details: { error: String(error), orderId: req.params.id } });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
