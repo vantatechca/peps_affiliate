@@ -107,7 +107,7 @@ export default function AdminPanel() {
         {tab === 'business' && <BusinessOverviewTab />}
         {tab === 'affiliates' && <AffiliatesTab isSuperAdmin={isSuperAdmin} onViewAs={setViewAsUserId} />}
         {tab === 'codes' && <CodesTab />}
-        {tab === 'orders' && <OrdersTab />}
+        {tab === 'orders' && <OrdersTab isSuperAdmin={isSuperAdmin} />}
         {tab === 'payouts' && <PayoutsTab />}
         {tab === 'admins' && isSuperAdmin && <AdminsTab onViewAs={setViewAsUserId} />}
         {tab === 'logs' && isSuperAdmin && <LogsTab />}
@@ -919,7 +919,7 @@ function downloadCSV(rows: string[][], headers: string[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function OrdersTab() {
+function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [data, setData] = useState<{ orders: any[]; total: number }>({ orders: [], total: 0 });
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -1142,7 +1142,9 @@ function OrdersTab() {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           isAdmin
+          isSuperAdmin={isSuperAdmin}
           onDelete={(id) => { handleDelete(id); setSelectedOrder(null); }}
+          onUpdated={(updated) => { setSelectedOrder(updated); loadOrders(); }}
         />
       )}
     </div>

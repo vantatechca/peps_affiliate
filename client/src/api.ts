@@ -128,6 +128,8 @@ export const api = {
     request(`/super/admins/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteAdmin: (id: string) =>
     request(`/super/admins/${id}`, { method: 'DELETE' }),
+  updateOrder: (id: string, data: { currency?: string; source?: string; storeName?: string }) =>
+    request(`/super/orders/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   viewAs: (userId: string) => request(`/super/view-as/${userId}`),
   getAllUsers: () => request('/super/all-users'),
 

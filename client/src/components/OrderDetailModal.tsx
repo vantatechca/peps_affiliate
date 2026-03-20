@@ -1,8 +1,13 @@
+import { useState } from 'react';
+import { api } from '../api';
+
 interface OrderDetailProps {
   order: any;
   onClose: () => void;
   isAdmin?: boolean;
+  isSuperAdmin?: boolean;
   onDelete?: (id: string) => void;
+  onUpdated?: (updatedOrder: any) => void;
 }
 
 function formatMoney(n: number) { return `$${n.toFixed(2)}`; }
@@ -13,13 +18,46 @@ function formatDateTime(d: string) {
   });
 }
 
-export default function OrderDetailModal({ order, onClose, isAdmin, onDelete }: OrderDetailProps) {
+export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin, onDelete, onUpdated }: OrderDetailProps) {
+  const [editing, setEditing] = useState(false);
+  const [editSource, setEditSource] = useState(order?.source || '');
+  const [editCurrency, setEditCurrency] = useState(order?.currency || 'USD');
+  const [editStoreName, setEditStoreName] = useState(order?.storeName || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
   if (!order) return null;
 
   const date = order.createdAt || order.date;
   const code = isAdmin ? order.discountCode?.code : order.discountCode;
   const affiliate = order.discountCode?.affiliate?.name;
   const codeLabel = isAdmin ? order.discountCode?.label : order.codeLabel;
+
+  function startEdit() {
+    setEditSource(order.source || '');
+    setEditCurrency(order.currency || 'USD');
+    setEditStoreName(order.storeName || '');
+    setError('');
+    setEditing(true);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError('');
+    try {
+      const updated = await api.updateOrder(order.id, {
+        source: editSource,
+        currency: editCurrency,
+        storeName: editStoreName,
+      });
+      setEditing(false);
+      onUpdated?.(updated);
+    } catch (err: any) {
+      setError(err.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -83,19 +121,94 @@ export default function OrderDetailModal({ order, onClose, isAdmin, onDelete }: 
             <Row label="Code Label" value={codeLabel} />
           )}
 
-          {/* Source & Attribution */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Source</p>
-              <span className="text-sm text-gray-700 capitalize">{order.source || '—'}</span>
+          {/* Source, Store, Currency & Attribution — editable for super admin */}
+          {editing ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 space-y-3">
+              <p className="text-xs font-medium text-blue-700">Editing Order</p>
+              {error && <p className="text-xs text-red-600">{error}</p>}
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Source</label>
+                <select
+                  value={editSource}
+                  onChange={(e) => setEditSource(e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="shopify">Shopify</option>
+                  <option value="wordpress">WordPress</option>
+                  <option value="stripe">Stripe</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Store Name</label>
+                <input
+                  type="text"
+                  value={editStoreName}
+                  onChange={(e) => setEditStoreName(e.target.value)}
+                  placeholder="Store name"
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Currency</label>
+                <select
+                  value={editCurrency}
+                  onChange={(e) => setEditCurrency(e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="USD">USD</option>
+                  <option value="CAD">CAD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                </select>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  disabled={saving}
+                  className="text-sm text-gray-600 px-3 py-1.5 rounded hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Attributed</p>
-              <span className={`text-sm font-medium ${order.attributed ? 'text-green-700' : 'text-gray-400'}`}>
-                {order.attributed ? 'Yes' : 'No'}
-              </span>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Source</p>
+                  <span className="text-sm text-gray-700 capitalize">{order.source || '—'}</span>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Attributed</p>
+                  <span className={`text-sm font-medium ${order.attributed ? 'text-green-700' : 'text-gray-400'}`}>
+                    {order.attributed ? 'Yes' : 'No'}
+                  </span>
+                </div>
+              </div>
+
+              {order.storeName && (
+                <Row label="Store" value={order.storeName} />
+              )}
+
+              <Row label="Currency" value={order.currency || 'USD'} />
+
+              {isSuperAdmin && (
+                <button
+                  onClick={startEdit}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Edit Source / Store / Currency
+                </button>
+              )}
+            </>
+          )}
 
           {/* External Order ID */}
           {order.externalOrderId && (
