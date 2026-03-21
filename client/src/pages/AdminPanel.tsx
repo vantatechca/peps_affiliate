@@ -129,8 +129,14 @@ function BusinessOverviewTab() {
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [chartView, setChartView] = useState<'weekly' | 'monthly'>('weekly');
   const [sourceFilter, setSourceFilter] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+  });
   const [recentNonAttributed, setRecentNonAttributed] = useState<any[]>([]);
   const [topStores, setTopStores] = useState<any[]>([]);
   const [sourceDist, setSourceDist] = useState<any[]>([]);
@@ -926,8 +932,14 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [filter, setFilter] = useState<'all' | 'yes' | 'no'>('all');
   const [search, setSearch] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+  });
   const [sourceFilter, setSourceFilter] = useState('');
   const [storeNameFilter, setStoreNameFilter] = useState('');
   const [storeNameDebounced, setStoreNameDebounced] = useState('');
