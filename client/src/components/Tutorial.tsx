@@ -167,7 +167,7 @@ export default function Tutorial({ steps, storageKey, activeTab, onComplete }: T
         {/* Tooltip */}
         <div
           ref={tooltipRef}
-          className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 max-w-sm"
+          className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 max-w-[calc(100vw-32px)] sm:max-w-sm"
           style={{ ...tooltipStyle, pointerEvents: 'auto' }}
         >
           <div className="flex items-start justify-between mb-2">

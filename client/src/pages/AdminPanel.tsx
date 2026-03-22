@@ -82,24 +82,24 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
-        <div className="px-6 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
               {isSuperAdmin ? 'Super Admin Panel' : 'Admin Panel'}
             </h1>
-            <p className="text-sm text-gray-500">{user?.name} {isSuperAdmin && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded ml-1">Super</span>}</p>
+            <p className="text-xs sm:text-sm text-gray-500 truncate">{user?.name} {isSuperAdmin && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded ml-1">Super</span>}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div data-tour="theme-toggle"><ThemeToggle /></div>
-            <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-900">Sign out</button>
+            <button onClick={logout} className="text-xs sm:text-sm text-gray-500 hover:text-gray-900 whitespace-nowrap">Sign out</button>
           </div>
         </div>
       </header>
-      <div className="px-6 py-6">
-        <div data-tour="admin-tabs" className="flex gap-1 mb-6 bg-white border border-gray-200 rounded-lg p-1 w-fit">
+      <div className="px-4 sm:px-6 py-4 sm:py-6">
+        <div data-tour="admin-tabs" className="scrollable-tabs flex gap-1 mb-6 bg-white border border-gray-200 rounded-lg p-1 w-full sm:w-fit">
           {tabs.map((t) => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-1.5 text-sm rounded-md ${tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+              className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md whitespace-nowrap ${tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
               {tabLabels[t] || t}
             </button>
           ))}
@@ -178,11 +178,11 @@ function BusinessOverviewTab() {
   return (
     <div>
       {/* Header with filters */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div data-tour="biz-source-filter" className="flex items-center gap-3 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+        <div data-tour="biz-source-filter" className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <label className="text-sm text-gray-500">Source:</label>
           <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
-            className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[140px]">
+            className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[120px]">
             <option value="">All Sources</option>
             <option value="shopify">Shopify</option>
             <option value="wordpress">WordPress</option>
@@ -196,7 +196,7 @@ function BusinessOverviewTab() {
             className="text-sm border border-gray-300 rounded px-2 py-1.5" />
           {(sourceFilter || startDate || endDate) && <button onClick={() => { setSourceFilter(''); setStartDate(''); setEndDate(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear all</button>}
         </div>
-        <button data-tour="admin-pdf" onClick={handleDownloadPDF} className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">Download PDF Report</button>
+        <button data-tour="admin-pdf" onClick={handleDownloadPDF} className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50 w-full sm:w-auto">Download PDF Report</button>
       </div>
 
       {/* Key Metrics */}
@@ -401,10 +401,10 @@ function BusinessOverviewTab() {
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub: string }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg px-4 py-4">
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
-      <p className="text-xl font-semibold text-gray-900">{value}</p>
-      <p className="text-xs text-gray-400 mt-1">{sub}</p>
+    <div className="bg-white border border-gray-200 rounded-lg px-3 sm:px-4 py-3 sm:py-4">
+      <p className="text-xs text-gray-500 mb-1 truncate">{label}</p>
+      <p className="text-lg sm:text-xl font-semibold text-gray-900 truncate">{value}</p>
+      <p className="text-xs text-gray-400 mt-1 truncate">{sub}</p>
     </div>
   );
 }
@@ -556,11 +556,11 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
         <div>
           {/* Affiliate Performance Overview */}
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div data-tour="aff-filter" className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
+              <div data-tour="aff-filter" className="flex items-center gap-2 sm:gap-3 flex-wrap">
                 <label className="text-sm text-gray-500">Filter by affiliate:</label>
                 <select value={selectedAffiliate} onChange={(e) => setSelectedAffiliate(e.target.value)}
-                  className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[200px]">
+                  className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-0 w-full sm:w-auto sm:min-w-[200px]">
                   <option value="">All Affiliates</option>
                   {affiliates.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
@@ -676,9 +676,9 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
       {subTab === 'manage' && (
         <div>
           {/* Affiliates CRUD Table */}
-          <div data-tour="aff-crud" className="flex justify-between items-center mb-4">
+          <div data-tour="aff-crud" className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
             <h2 className="text-sm font-medium text-gray-900">{affiliates.length} Affiliates</h2>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {selectedIds.size > 0 && (
                 <button onClick={handleBatchDelete}
                   className="text-sm bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700">
@@ -686,17 +686,17 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
                 </button>
               )}
               <button onClick={handleDownloadAffiliatesCSV}
-                className="text-sm border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50">
-                Download CSV
+                className="text-sm border border-gray-300 text-gray-700 px-3 sm:px-4 py-2 rounded hover:bg-gray-50">
+                CSV
               </button>
-              <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Affiliate</button>
+              <button onClick={openCreate} className="bg-gray-900 text-white text-sm px-3 sm:px-4 py-2 rounded hover:bg-gray-800">Add Affiliate</button>
             </div>
           </div>
 
           {showModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
               <div className="fixed inset-0 bg-black bg-opacity-40" onClick={() => setShowModal(false)} />
-              <div className="relative bg-white rounded-lg border border-gray-200 w-full max-w-md mx-4 p-6">
+              <div className="relative bg-white rounded-t-xl sm:rounded-lg border border-gray-200 w-full sm:max-w-md sm:mx-4 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold text-gray-900">{editing ? 'Edit' : 'New'} Affiliate</h3>
                   <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
@@ -842,9 +842,9 @@ function CodesTab() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
         <h2 className="text-sm font-medium text-gray-900">{codes.length} Discount Codes</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {selectedIds.size > 0 && (
             <button onClick={handleBatchDelete}
               className="text-sm bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700">
@@ -856,9 +856,9 @@ function CodesTab() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="fixed inset-0 bg-black bg-opacity-40" onClick={() => setShowForm(false)} />
-          <div className="relative bg-white rounded-lg border border-gray-200 w-full max-w-md mx-4 p-6">
+          <div className="relative bg-white rounded-t-xl sm:rounded-lg border border-gray-200 w-full sm:max-w-md sm:mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-gray-900">{editing ? 'Edit' : 'New'} Discount Code</h3>
               <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
@@ -1043,9 +1043,9 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
         <h2 className="text-sm font-medium text-gray-900">All Orders ({data.total})</h2>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
           <div data-tour="orders-search" className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -1055,7 +1055,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search orders..."
-              className="pl-9 pr-8 py-1.5 text-sm border border-gray-300 rounded w-64 focus:outline-none focus:border-gray-900"
+              className="pl-9 pr-8 py-1.5 text-sm border border-gray-300 rounded w-full sm:w-64 focus:outline-none focus:border-gray-900"
             />
             {search && (
               <button onClick={() => { setSearch(''); setSearchDebounced(''); setPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">&times;</button>
@@ -1066,7 +1066,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
               <button
                 key={val}
                 onClick={() => setFilter(val)}
-                className={`px-3 py-1 text-xs rounded-md ${filter === val ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                className={`px-3 py-1 text-xs rounded-md flex-1 sm:flex-none ${filter === val ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}
               >
                 {label}
               </button>
@@ -1076,7 +1076,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
       </div>
 
       {/* Date Range + Source/Currency Filters + Actions */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <label className="text-xs text-gray-500">From:</label>
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
@@ -1092,7 +1092,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
             <option value="stripe">Stripe</option>
           </select>
           <input type="text" value={storeNameFilter} onChange={(e) => handleStoreNameFilter(e.target.value)}
-            placeholder="Filter by store name..." className="text-sm border border-gray-300 rounded px-2 py-1 w-40" />
+            placeholder="Filter by store..." className="text-sm border border-gray-300 rounded px-2 py-1 w-32 sm:w-40" />
           <select value={currencyFilter} onChange={(e) => setCurrencyFilter(e.target.value)}
             className="text-sm border border-gray-300 rounded px-2 py-1">
             <option value="">All Currencies</option>
@@ -1197,15 +1197,15 @@ function PayoutsTab() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
         <h2 className="text-sm font-medium text-gray-900">{payouts.length} Payouts</h2>
-        <button data-tour="payouts-create" onClick={() => setShowForm(true)} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Create Payout</button>
+        <button data-tour="payouts-create" onClick={() => setShowForm(true)} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800 w-full sm:w-auto">Create Payout</button>
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="fixed inset-0 bg-black bg-opacity-40" onClick={() => setShowForm(false)} />
-          <div className="relative bg-white rounded-lg border border-gray-200 w-full max-w-md mx-4 p-6">
+          <div className="relative bg-white rounded-t-xl sm:rounded-lg border border-gray-200 w-full sm:max-w-md sm:mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-gray-900">New Payout</h3>
               <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
@@ -1337,9 +1337,9 @@ function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
         <h2 className="text-sm font-medium text-gray-900">{admins.length} Admins</h2>
-        <button data-tour="admins-add" onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800">Add Admin</button>
+        <button data-tour="admins-add" onClick={openCreate} className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800 w-full sm:w-auto">Add Admin</button>
       </div>
 
       {showModal && (

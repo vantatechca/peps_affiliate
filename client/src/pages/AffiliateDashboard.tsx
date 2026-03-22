@@ -141,18 +141,24 @@ export default function AffiliateDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">Affiliate Dashboard</h1>
-            <p className="text-sm text-gray-500">Welcome, {user?.name}</p>
+        <div className="max-w-6xl mx-auto px-4 py-3 sm:py-4 flex justify-between items-center gap-2">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-semibold text-gray-900 truncate">Affiliate Dashboard</h1>
+            <p className="text-xs sm:text-sm text-gray-500 truncate">Welcome, {user?.name}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button data-tour="aff-pdf" onClick={handleDownloadPDF}
-              className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">
-              Download PDF Report
+              className="text-xs sm:text-sm border border-gray-300 text-gray-700 px-2 sm:px-3 py-1.5 rounded hover:bg-gray-50 hidden sm:block">
+              Download PDF
+            </button>
+            <button data-tour="aff-pdf" onClick={handleDownloadPDF}
+              className="sm:hidden p-1.5 border border-gray-300 text-gray-700 rounded hover:bg-gray-50" title="Download PDF Report">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
             </button>
             <div data-tour="theme-toggle"><ThemeToggle /></div>
-            <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-900">Sign out</button>
+            <button onClick={logout} className="text-xs sm:text-sm text-gray-500 hover:text-gray-900 whitespace-nowrap">Sign out</button>
           </div>
         </div>
       </header>
@@ -213,10 +219,10 @@ export default function AffiliateDashboard() {
         </div>
 
         {/* Tabs */}
-        <div data-tour="aff-tabs" className="flex gap-1 mb-4 bg-white border border-gray-200 rounded-lg p-1 w-fit">
+        <div data-tour="aff-tabs" className="flex gap-1 mb-4 bg-white border border-gray-200 rounded-lg p-1 w-full sm:w-fit">
           {(['overview', 'orders', 'codes'] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-1.5 text-sm rounded-md capitalize ${tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+              className={`flex-1 sm:flex-none px-4 py-1.5 text-sm rounded-md capitalize ${tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
               {t}
             </button>
           ))}
@@ -224,37 +230,39 @@ export default function AffiliateDashboard() {
 
         {(tab === 'overview' || tab === 'orders') && (
           <div data-tour={tab === 'overview' ? 'aff-recent-sales' : 'aff-orders-table'} className="bg-white border border-gray-200 rounded-lg">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
-              <h2 className="text-sm font-medium text-gray-900">
-                {tab === 'orders' ? `All Orders (${ordersTotal})` : 'Recent Sales'}
-              </h2>
-              <div className="flex items-center gap-2 flex-wrap">
-                <select data-tour="aff-period-filter" value={startDate || endDate ? 'custom' : period} onChange={(e) => {
-                  if (e.target.value === 'custom') return;
-                  setPeriod(e.target.value); setStartDate(''); setEndDate('');
-                }}
-                  className="text-sm border border-gray-300 rounded px-2 py-1">
-                  <option value="">All time</option>
-                  <option value="today">Today</option>
-                  <option value="week">This week</option>
-                  <option value="month">This month</option>
-                  <option value="custom" disabled>Custom range</option>
-                </select>
-                <label className="text-xs text-gray-500">From:</label>
-                <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPeriod(''); }}
-                  className="text-sm border border-gray-300 rounded px-2 py-1" />
-                <label className="text-xs text-gray-500">To:</label>
-                <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPeriod(''); }}
-                  className="text-sm border border-gray-300 rounded px-2 py-1" />
-                {(startDate || endDate) && (
-                  <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear</button>
-                )}
-                {tab === 'orders' && (
-                  <button onClick={handleDownloadCSV}
-                    className="text-sm border border-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-50">
-                    Download CSV
-                  </button>
-                )}
+            <div className="px-4 py-3 border-b border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h2 className="text-sm font-medium text-gray-900">
+                  {tab === 'orders' ? `All Orders (${ordersTotal})` : 'Recent Sales'}
+                </h2>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select data-tour="aff-period-filter" value={startDate || endDate ? 'custom' : period} onChange={(e) => {
+                    if (e.target.value === 'custom') return;
+                    setPeriod(e.target.value); setStartDate(''); setEndDate('');
+                  }}
+                    className="text-sm border border-gray-300 rounded px-2 py-1">
+                    <option value="">All time</option>
+                    <option value="today">Today</option>
+                    <option value="week">This week</option>
+                    <option value="month">This month</option>
+                    <option value="custom" disabled>Custom range</option>
+                  </select>
+                  <label className="text-xs text-gray-500">From:</label>
+                  <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPeriod(''); }}
+                    className="text-sm border border-gray-300 rounded px-2 py-1" />
+                  <label className="text-xs text-gray-500">To:</label>
+                  <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPeriod(''); }}
+                    className="text-sm border border-gray-300 rounded px-2 py-1" />
+                  {(startDate || endDate) && (
+                    <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear</button>
+                  )}
+                  {tab === 'orders' && (
+                    <button onClick={handleDownloadCSV}
+                      className="text-sm border border-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-50">
+                      CSV
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
             <OrdersTable orders={tab === 'overview' ? orders.slice(0, 10) : orders} />
@@ -306,10 +314,10 @@ export default function AffiliateDashboard() {
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg px-4 py-4">
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
-      <p className="text-xl font-semibold text-gray-900">{value}</p>
-      <p className="text-xs text-gray-400 mt-1">{sub}</p>
+    <div className="bg-white border border-gray-200 rounded-lg px-3 sm:px-4 py-3 sm:py-4">
+      <p className="text-xs text-gray-500 mb-1 truncate">{label}</p>
+      <p className="text-lg sm:text-xl font-semibold text-gray-900 truncate">{value}</p>
+      <p className="text-xs text-gray-400 mt-1 truncate">{sub}</p>
     </div>
   );
 }
