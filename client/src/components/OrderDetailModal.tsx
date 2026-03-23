@@ -60,17 +60,17 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="fixed inset-0 bg-black bg-opacity-40" onClick={onClose} />
-      <div className="relative bg-white rounded-lg border border-gray-200 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-white rounded-t-xl sm:rounded-lg border border-gray-200 w-full sm:max-w-lg sm:mx-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-lg">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between rounded-t-lg">
           <h3 className="text-base font-semibold text-gray-900">Order Details</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-4 sm:px-6 py-4 space-y-4">
           {/* Date */}
           <Row label="Date & Time" value={date ? formatDateTime(date) : '—'} />
 
@@ -220,7 +220,7 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 py-3 flex justify-between rounded-b-lg">
+        <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 sm:px-6 py-3 flex justify-between rounded-b-lg">
           {isAdmin && onDelete ? (
             <button
               onClick={() => { onDelete(order.id); onClose(); }}

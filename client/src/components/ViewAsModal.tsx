@@ -22,11 +22,11 @@ export default function ViewAsModal({ userId, onClose }: ViewAsProps) {
   }, [userId]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-white dark:bg-gray-800 rounded-t-xl sm:rounded-lg border border-gray-200 dark:border-gray-700 w-full sm:max-w-4xl sm:mx-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-6 py-4 flex items-center justify-between rounded-t-lg z-10">
+        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between rounded-t-xl sm:rounded-t-lg z-10">
           <div>
             <h3 className="text-base font-semibold text-gray-900">
               Viewing as: {data?.user?.name || 'Loading...'}
@@ -46,7 +46,7 @@ export default function ViewAsModal({ userId, onClose }: ViewAsProps) {
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4">
+        <div className="px-4 sm:px-6 py-4">
           {loading && <div className="text-gray-500 text-center py-12">Loading dashboard...</div>}
 
           {!loading && !data && <div className="text-red-500 text-center py-12">Failed to load</div>}
@@ -57,7 +57,7 @@ export default function ViewAsModal({ userId, onClose }: ViewAsProps) {
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-6 py-3 flex justify-end rounded-b-lg">
+        <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-4 sm:px-6 py-3 flex justify-end rounded-b-lg">
           <button onClick={onClose} className="text-sm bg-gray-900 text-white px-4 py-2 rounded hover:bg-gray-800">
             Close
           </button>

@@ -95,7 +95,7 @@ function ResizableHeader({
   return (
     <th
       style={{ width, minWidth: 50, position: 'relative' }}
-      className={`px-4 py-2 font-medium text-gray-500 select-none ${align === 'right' ? 'text-right' : ''}`}
+      className={`px-3 sm:px-4 py-2 font-medium text-gray-500 select-none text-xs sm:text-sm ${align === 'right' ? 'text-right' : ''}`}
     >
       <div
         className={`flex items-center gap-1 ${sortable ? 'cursor-pointer hover:text-gray-900' : ''} ${align === 'right' ? 'justify-end' : ''}`}
@@ -236,7 +236,7 @@ export default function DataTable({
                 <td
                   key={col.key}
                   style={{ width: widths[col.key] }}
-                  className={`px-4 py-3 truncate ${col.align === 'right' ? 'text-right' : ''} ${col.className || ''}`}
+                  className={`px-3 sm:px-4 py-2.5 sm:py-3 truncate ${col.align === 'right' ? 'text-right' : ''} ${col.className || ''}`}
                   onClick={col.key === '_actions' ? (e) => e.stopPropagation() : undefined}
                 >
                   {col.render ? col.render(row) : getNestedValue(row, col.key) ?? '—'}
