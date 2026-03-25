@@ -528,7 +528,10 @@ router.get('/admin/business/top-products', async (req: Request, res: Response) =
 
         if (!productName) continue;
 
-        // Normalize the product name (title case, trim extra spaces)
+        // Exclude reconstitution solution products
+        if (productName.toLowerCase().includes('reconstitution solution')) continue;
+
+        // Normalize the product name (trim extra spaces)
         const normalizedName = productName.replace(/\s+/g, ' ');
 
         const existing = productMap.get(normalizedName.toLowerCase());

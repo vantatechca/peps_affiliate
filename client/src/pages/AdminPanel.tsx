@@ -375,7 +375,6 @@ function BusinessOverviewTab() {
                   <th className="px-4 py-2 text-gray-500 font-medium text-right">Qty Sold</th>
                   <th className="px-4 py-2 text-gray-500 font-medium text-right">Orders</th>
                   <th className="px-4 py-2 text-gray-500 font-medium text-right">Revenue</th>
-                  <th className="px-4 py-2 text-gray-500 font-medium text-right">Attributed</th>
                 </tr>
               </thead>
               <tbody>
@@ -386,11 +385,6 @@ function BusinessOverviewTab() {
                     <td className="px-4 py-2.5 text-gray-600 text-right">{p.quantity}</td>
                     <td className="px-4 py-2.5 text-gray-600 text-right">{p.orders}</td>
                     <td className="px-4 py-2.5 text-gray-900 text-right font-medium">{formatMoney(p.revenue)}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${p.attributedOrders > 0 ? 'bg-green-50 text-green-700' : 'text-gray-400'}`}>
-                        {p.attributedOrders} / {p.orders}
-                      </span>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -400,7 +394,6 @@ function BusinessOverviewTab() {
                   <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{topProducts.reduce((s, p) => s + p.quantity, 0)}</td>
                   <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{topProducts.reduce((s, p) => s + p.orders, 0)}</td>
                   <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{formatMoney(topProducts.reduce((s, p) => s + p.revenue, 0))}</td>
-                  <td className="px-4 py-2.5 text-green-700 font-semibold text-right text-sm">{topProducts.reduce((s, p) => s + p.attributedOrders, 0)}</td>
                 </tr>
               </tfoot>
             </table>
