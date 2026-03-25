@@ -481,4 +481,87 @@ router.get('/admin/business/source-distribution', async (req: Request, res: Resp
   }
 });
 
+// GET /api/charts/admin/business/top-products - top products by sales frequency & revenue
+router.get('/admin/business/top-products', async (req: Request, res: Response) => {
+  try {
+    const { source, startDate, endDate, limit } = req.query;
+    const where: any = {};
+    if (source) where.source = source as string;
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate as string);
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    const orders = await prisma.order.findMany({
+      where,
+      select: { itemsSummary: true, orderTotal: true, attributed: true },
+    });
+
+    // Parse itemsSummary and aggregate products
+    const productMap = new Map<string, { name: string; quantity: number; orders: number; revenue: number; attributedOrders: number }>();
+
+    for (const order of orders) {
+      if (!order.itemsSummary || !order.itemsSummary.trim()) continue;
+
+      // Split by comma to get individual items
+      const items = order.itemsSummary.split(',').map(s => s.trim()).filter(Boolean);
+      const uniqueItems = new Set<string>();
+
+      for (const item of items) {
+        // Try to parse quantity prefix like "2x Product Name" or "2 x Product Name"
+        const qtyMatch = item.match(/^(\d+)\s*x\s+(.+)$/i);
+        let productName: string;
+        let qty: number;
+
+        if (qtyMatch) {
+          qty = parseInt(qtyMatch[1], 10);
+          productName = qtyMatch[2].trim();
+        } else {
+          qty = 1;
+          productName = item.trim();
+        }
+
+        if (!productName) continue;
+
+        // Normalize the product name (title case, trim extra spaces)
+        const normalizedName = productName.replace(/\s+/g, ' ');
+
+        const existing = productMap.get(normalizedName.toLowerCase());
+        if (existing) {
+          existing.quantity += qty;
+          if (!uniqueItems.has(normalizedName.toLowerCase())) {
+            existing.orders += 1;
+            existing.revenue += order.orderTotal;
+            if (order.attributed) existing.attributedOrders += 1;
+          }
+        } else {
+          productMap.set(normalizedName.toLowerCase(), {
+            name: normalizedName,
+            quantity: qty,
+            orders: 1,
+            revenue: order.orderTotal,
+            attributedOrders: order.attributed ? 1 : 0,
+          });
+        }
+        uniqueItems.add(normalizedName.toLowerCase());
+      }
+    }
+
+    const maxResults = Math.min(parseInt(limit as string, 10) || 20, 100);
+    const products = Array.from(productMap.values())
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, maxResults);
+
+    res.json(products);
+  } catch (error) {
+    console.error('Top products error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
