@@ -109,6 +109,14 @@ export const api = {
     const q = qs.toString();
     return request(`/charts/admin/business/top-stores${q ? `?${q}` : ''}`);
   },
+  topProducts: (params?: { source?: string; startDate?: string; endDate?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.source) qs.set('source', params.source);
+    if (params?.startDate) qs.set('startDate', params.startDate);
+    if (params?.endDate) qs.set('endDate', params.endDate);
+    const q = qs.toString();
+    return request(`/charts/admin/business/top-products${q ? `?${q}` : ''}`);
+  },
   sourceDistribution: (params?: { startDate?: string; endDate?: string }) => {
     const qs = new URLSearchParams();
     if (params?.startDate) qs.set('startDate', params.startDate);

@@ -140,6 +140,7 @@ function BusinessOverviewTab() {
   const [recentNonAttributed, setRecentNonAttributed] = useState<any[]>([]);
   const [topStores, setTopStores] = useState<any[]>([]);
   const [sourceDist, setSourceDist] = useState<any[]>([]);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
 
   useEffect(() => {
     api.getOrders({ limit: '10', attributed: 'false' }).then((d) => setRecentNonAttributed(d.orders));
@@ -156,10 +157,10 @@ function BusinessOverviewTab() {
     const storeParams: any = {};
     if (startDate) storeParams.startDate = startDate;
     if (endDate) storeParams.endDate = endDate;
-    const [s, w, m, stores, dist] = await Promise.all([
-      api.businessStats(statsParams), api.businessWeekly(src), api.businessMonthly(src), api.topStores(storeParams), api.sourceDistribution(storeParams),
+    const [s, w, m, stores, dist, products] = await Promise.all([
+      api.businessStats(statsParams), api.businessWeekly(src), api.businessMonthly(src), api.topStores(storeParams), api.sourceDistribution(storeParams), api.topProducts(statsParams),
     ]);
-    setStats(s); setWeeklyData(w); setMonthlyData(m); setTopStores(stores); setSourceDist(dist);
+    setStats(s); setWeeklyData(w); setMonthlyData(m); setTopStores(stores); setSourceDist(dist); setTopProducts(products);
   }
 
   function handleDownloadPDF() {
@@ -351,6 +352,55 @@ function BusinessOverviewTab() {
                   <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{topStores.reduce((s, st) => s + st.orders, 0)}</td>
                   <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{formatMoney(topStores.reduce((s, st) => s + st.revenue, 0))}</td>
                   <td className="px-4 py-2.5 text-green-700 font-semibold text-right text-sm">{formatMoney(topStores.reduce((s, st) => s + st.commissions, 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Top Products Sold */}
+      {topProducts.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg mb-6">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-sm font-medium text-gray-900">Top Products Sold</h2>
+            <span className="text-xs text-gray-400">{topProducts.length} products</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left">
+                  <th className="px-4 py-2 text-gray-500 font-medium">#</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium">Product</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium text-right">Qty Sold</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium text-right">Orders</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium text-right">Revenue</th>
+                  <th className="px-4 py-2 text-gray-500 font-medium text-right">Attributed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topProducts.map((p: any, i: number) => (
+                  <tr key={p.name} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-2.5 text-gray-400 text-xs">{i + 1}</td>
+                    <td className="px-4 py-2.5 text-gray-900 font-medium">{p.name}</td>
+                    <td className="px-4 py-2.5 text-gray-600 text-right">{p.quantity}</td>
+                    <td className="px-4 py-2.5 text-gray-600 text-right">{p.orders}</td>
+                    <td className="px-4 py-2.5 text-gray-900 text-right font-medium">{formatMoney(p.revenue)}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${p.attributedOrders > 0 ? 'bg-green-50 text-green-700' : 'text-gray-400'}`}>
+                        {p.attributedOrders} / {p.orders}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-gray-50 border-t border-gray-200">
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-sm" colSpan={2}>Total</td>
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{topProducts.reduce((s, p) => s + p.quantity, 0)}</td>
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{topProducts.reduce((s, p) => s + p.orders, 0)}</td>
+                  <td className="px-4 py-2.5 text-gray-900 font-semibold text-right text-sm">{formatMoney(topProducts.reduce((s, p) => s + p.revenue, 0))}</td>
+                  <td className="px-4 py-2.5 text-green-700 font-semibold text-right text-sm">{topProducts.reduce((s, p) => s + p.attributedOrders, 0)}</td>
                 </tr>
               </tfoot>
             </table>
