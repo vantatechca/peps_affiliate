@@ -159,14 +159,14 @@ async function main() {
 
   // Affiliate 1 orders
   const orders1 = [
-    { customerFirstName: 'John', itemsSummary: 'BPC-157 x2, TB-500 x1', orderTotal: 189.00, daysAgo: 0 },
-    { customerFirstName: 'Sarah', itemsSummary: 'BPC-157 x1', orderTotal: 79.00, daysAgo: 0 },
-    { customerFirstName: 'Mike', itemsSummary: 'GHK-Cu x1, BPC-157 x1', orderTotal: 145.00, daysAgo: 1 },
-    { customerFirstName: 'Emily', itemsSummary: 'TB-500 x3', orderTotal: 267.00, daysAgo: 2 },
-    { customerFirstName: 'David', itemsSummary: 'BPC-157 x1', orderTotal: 79.00, daysAgo: 5 },
-    { customerFirstName: 'Lisa', itemsSummary: 'Semax x2, Selank x1', orderTotal: 198.00, daysAgo: 7 },
-    { customerFirstName: 'James', itemsSummary: 'BPC-157 x1, GHK-Cu x1', orderTotal: 158.00, daysAgo: 12 },
-    { customerFirstName: 'Anna', itemsSummary: 'TB-500 x1', orderTotal: 89.00, daysAgo: 20 },
+    { customerFirstName: 'John', customerLastName: 'Smith', itemsSummary: 'BPC-157 x2, TB-500 x1', orderTotal: 189.00, daysAgo: 0 },
+    { customerFirstName: 'Sarah', customerLastName: 'Johnson', itemsSummary: 'BPC-157 x1', orderTotal: 79.00, daysAgo: 0 },
+    { customerFirstName: 'Mike', customerLastName: 'Williams', itemsSummary: 'GHK-Cu x1, BPC-157 x1', orderTotal: 145.00, daysAgo: 1 },
+    { customerFirstName: 'Emily', customerLastName: 'Brown', itemsSummary: 'TB-500 x3', orderTotal: 267.00, daysAgo: 2 },
+    { customerFirstName: 'David', customerLastName: 'Jones', itemsSummary: 'BPC-157 x1', orderTotal: 79.00, daysAgo: 5 },
+    { customerFirstName: 'Lisa', customerLastName: 'Davis', itemsSummary: 'Semax x2, Selank x1', orderTotal: 198.00, daysAgo: 7 },
+    { customerFirstName: 'James', customerLastName: 'Miller', itemsSummary: 'BPC-157 x1, GHK-Cu x1', orderTotal: 158.00, daysAgo: 12 },
+    { customerFirstName: 'Anna', customerLastName: 'Wilson', itemsSummary: 'TB-500 x1', orderTotal: 89.00, daysAgo: 20 },
   ];
 
   for (const o of orders1) {
@@ -177,6 +177,7 @@ async function main() {
       data: {
         discountCodeId: o.daysAgo % 2 === 0 ? code1.id : code2.id,
         customerFirstName: o.customerFirstName,
+        customerLastName: (o as any).customerLastName || null,
         itemsSummary: o.itemsSummary,
         orderTotal: o.orderTotal,
         commissionEarned: commission,
@@ -190,18 +191,18 @@ async function main() {
 
   // Affiliate 2 orders (Jake - high performer)
   const orders2 = [
-    { customerFirstName: 'Tyler', itemsSummary: 'BPC-157 x3, TB-500 x2', orderTotal: 345.00, daysAgo: 0 },
-    { customerFirstName: 'Brandon', itemsSummary: 'GHK-Cu x2, Semax x1', orderTotal: 220.00, daysAgo: 0 },
-    { customerFirstName: 'Chris', itemsSummary: 'TB-500 x2', orderTotal: 178.00, daysAgo: 1 },
-    { customerFirstName: 'Jordan', itemsSummary: 'BPC-157 x4', orderTotal: 316.00, daysAgo: 1 },
-    { customerFirstName: 'Alex', itemsSummary: 'BPC-157 x1, Selank x2', orderTotal: 237.00, daysAgo: 2 },
-    { customerFirstName: 'Ryan', itemsSummary: 'TB-500 x1, GHK-Cu x1', orderTotal: 178.00, daysAgo: 3 },
-    { customerFirstName: 'Matt', itemsSummary: 'BPC-157 x2', orderTotal: 158.00, daysAgo: 4 },
-    { customerFirstName: 'Derek', itemsSummary: 'Semax x3, Selank x2', orderTotal: 295.00, daysAgo: 5 },
-    { customerFirstName: 'Nick', itemsSummary: 'BPC-157 x1', orderTotal: 79.00, daysAgo: 6 },
-    { customerFirstName: 'Kevin', itemsSummary: 'TB-500 x2, BPC-157 x1', orderTotal: 257.00, daysAgo: 8 },
-    { customerFirstName: 'Brian', itemsSummary: 'GHK-Cu x3', orderTotal: 267.00, daysAgo: 14 },
-    { customerFirstName: 'Steve', itemsSummary: 'BPC-157 x1, TB-500 x1', orderTotal: 168.00, daysAgo: 25 },
+    { customerFirstName: 'Tyler', customerLastName: 'Anderson', itemsSummary: 'BPC-157 x3, TB-500 x2', orderTotal: 345.00, daysAgo: 0 },
+    { customerFirstName: 'Brandon', customerLastName: 'Taylor', itemsSummary: 'GHK-Cu x2, Semax x1', orderTotal: 220.00, daysAgo: 0 },
+    { customerFirstName: 'Chris', customerLastName: 'Thomas', itemsSummary: 'TB-500 x2', orderTotal: 178.00, daysAgo: 1 },
+    { customerFirstName: 'Jordan', customerLastName: 'Jackson', itemsSummary: 'BPC-157 x4', orderTotal: 316.00, daysAgo: 1 },
+    { customerFirstName: 'Alex', customerLastName: 'White', itemsSummary: 'BPC-157 x1, Selank x2', orderTotal: 237.00, daysAgo: 2 },
+    { customerFirstName: 'Ryan', customerLastName: 'Harris', itemsSummary: 'TB-500 x1, GHK-Cu x1', orderTotal: 178.00, daysAgo: 3 },
+    { customerFirstName: 'Matt', customerLastName: 'Martin', itemsSummary: 'BPC-157 x2', orderTotal: 158.00, daysAgo: 4 },
+    { customerFirstName: 'Derek', customerLastName: 'Garcia', itemsSummary: 'Semax x3, Selank x2', orderTotal: 295.00, daysAgo: 5 },
+    { customerFirstName: 'Nick', customerLastName: 'Martinez', itemsSummary: 'BPC-157 x1', orderTotal: 79.00, daysAgo: 6 },
+    { customerFirstName: 'Kevin', customerLastName: 'Robinson', itemsSummary: 'TB-500 x2, BPC-157 x1', orderTotal: 257.00, daysAgo: 8 },
+    { customerFirstName: 'Brian', customerLastName: 'Clark', itemsSummary: 'GHK-Cu x3', orderTotal: 267.00, daysAgo: 14 },
+    { customerFirstName: 'Steve', customerLastName: 'Lewis', itemsSummary: 'BPC-157 x1, TB-500 x1', orderTotal: 168.00, daysAgo: 25 },
   ];
 
   for (const o of orders2) {
@@ -212,6 +213,7 @@ async function main() {
       data: {
         discountCodeId: o.daysAgo % 2 === 0 ? code3.id : code4.id,
         customerFirstName: o.customerFirstName,
+        customerLastName: (o as any).customerLastName || null,
         itemsSummary: o.itemsSummary,
         orderTotal: o.orderTotal,
         commissionEarned: commission,
@@ -225,12 +227,12 @@ async function main() {
 
   // Affiliate 3 orders (Sarah - medium performer)
   const orders3 = [
-    { customerFirstName: 'Rachel', itemsSummary: 'Semax x1, Selank x1', orderTotal: 158.00, daysAgo: 0 },
-    { customerFirstName: 'Olivia', itemsSummary: 'BPC-157 x1', orderTotal: 79.00, daysAgo: 1 },
-    { customerFirstName: 'Emma', itemsSummary: 'GHK-Cu x2', orderTotal: 178.00, daysAgo: 3 },
-    { customerFirstName: 'Sophia', itemsSummary: 'TB-500 x1, BPC-157 x1', orderTotal: 168.00, daysAgo: 5 },
-    { customerFirstName: 'Mia', itemsSummary: 'Semax x2', orderTotal: 138.00, daysAgo: 9 },
-    { customerFirstName: 'Ava', itemsSummary: 'BPC-157 x2, GHK-Cu x1', orderTotal: 247.00, daysAgo: 15 },
+    { customerFirstName: 'Rachel', customerLastName: 'Lee', itemsSummary: 'Semax x1, Selank x1', orderTotal: 158.00, daysAgo: 0 },
+    { customerFirstName: 'Olivia', customerLastName: 'Walker', itemsSummary: 'BPC-157 x1', orderTotal: 79.00, daysAgo: 1 },
+    { customerFirstName: 'Emma', customerLastName: 'Hall', itemsSummary: 'GHK-Cu x2', orderTotal: 178.00, daysAgo: 3 },
+    { customerFirstName: 'Sophia', customerLastName: 'Allen', itemsSummary: 'TB-500 x1, BPC-157 x1', orderTotal: 168.00, daysAgo: 5 },
+    { customerFirstName: 'Mia', customerLastName: 'Young', itemsSummary: 'Semax x2', orderTotal: 138.00, daysAgo: 9 },
+    { customerFirstName: 'Ava', customerLastName: 'King', itemsSummary: 'BPC-157 x2, GHK-Cu x1', orderTotal: 247.00, daysAgo: 15 },
   ];
 
   for (const o of orders3) {
@@ -241,6 +243,7 @@ async function main() {
       data: {
         discountCodeId: code5.id,
         customerFirstName: o.customerFirstName,
+        customerLastName: (o as any).customerLastName || null,
         itemsSummary: o.itemsSummary,
         orderTotal: o.orderTotal,
         commissionEarned: commission,
@@ -254,9 +257,9 @@ async function main() {
 
   // Affiliate 4 orders (Mike - smaller)
   const orders4 = [
-    { customerFirstName: 'Dan', itemsSummary: 'BPC-157 x1, Semax x1', orderTotal: 148.00, daysAgo: 1 },
-    { customerFirstName: 'Tom', itemsSummary: 'TB-500 x1', orderTotal: 89.00, daysAgo: 4 },
-    { customerFirstName: 'Ben', itemsSummary: 'GHK-Cu x1, Selank x1', orderTotal: 167.00, daysAgo: 10 },
+    { customerFirstName: 'Dan', customerLastName: 'Wright', itemsSummary: 'BPC-157 x1, Semax x1', orderTotal: 148.00, daysAgo: 1 },
+    { customerFirstName: 'Tom', customerLastName: 'Lopez', itemsSummary: 'TB-500 x1', orderTotal: 89.00, daysAgo: 4 },
+    { customerFirstName: 'Ben', customerLastName: 'Hill', itemsSummary: 'GHK-Cu x1, Selank x1', orderTotal: 167.00, daysAgo: 10 },
   ];
 
   for (const o of orders4) {
@@ -267,6 +270,7 @@ async function main() {
       data: {
         discountCodeId: code6.id,
         customerFirstName: o.customerFirstName,
+        customerLastName: (o as any).customerLastName || null,
         itemsSummary: o.itemsSummary,
         orderTotal: o.orderTotal,
         commissionEarned: commission,
