@@ -58,6 +58,7 @@ model Order {
   discountCodeId    String?
   discountCode      DiscountCode? @relation(fields: [discountCodeId], references: [id])
   customerFirstName String
+  customerLastName  String?
   itemsSummary      String
   orderTotal        Float
   commissionEarned  Float         @default(0)

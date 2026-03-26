@@ -10,6 +10,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
   try {
     const {
       customer_first_name,
+      customer_last_name,
       items_summary,
       order_total,
       discount_code,
@@ -149,6 +150,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
         externalOrderId: external_order_id || null,
         discountCodeId: discountCodeRecord?.id || null,
         customerFirstName: customer_first_name,
+        customerLastName: customer_last_name || null,
         itemsSummary: items_summary || '',
         orderTotal: parseFloat(order_total),
         commissionEarned,

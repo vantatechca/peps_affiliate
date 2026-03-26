@@ -75,7 +75,7 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
           <Row label="Date & Time" value={date ? formatDateTime(date) : '—'} />
 
           {/* Customer */}
-          <Row label="Customer" value={order.customerFirstName || '—'} bold />
+          <Row label="Customer" value={isAdmin ? [order.customerFirstName, order.customerLastName].filter(Boolean).join(' ') || '—' : order.customerFirstName || '—'} bold />
 
           {/* Items - full text, no truncation */}
           <div>

@@ -422,7 +422,7 @@ function BusinessOverviewTab() {
                 {recentNonAttributed.map((o: any) => (
                   <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{formatDateTime(o.createdAt)}</td>
-                    <td className="px-4 py-2.5 text-gray-900">{o.customerFirstName}</td>
+                    <td className="px-4 py-2.5 text-gray-900">{[o.customerFirstName, o.customerLastName].filter(Boolean).join(' ')}</td>
                     <td className="px-4 py-2.5 text-gray-600 truncate max-w-[200px]">{o.itemsSummary}</td>
                     <td className="px-4 py-2.5 text-gray-900 text-right font-medium">{formatMoney(o.orderTotal)}</td>
                   </tr>
@@ -1068,7 +1068,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
       ),
     },
     { key: 'createdAt', label: 'Date & Time', defaultWidth: 180, render: (r: any) => <span className="text-gray-500 text-xs">{formatDateTime(r.createdAt)}</span> },
-    { key: 'customerFirstName', label: 'Customer', defaultWidth: 120, className: 'text-gray-900' },
+    { key: 'customerFirstName', label: 'Customer', defaultWidth: 150, render: (r: any) => <span className="text-gray-900">{[r.customerFirstName, r.customerLastName].filter(Boolean).join(' ')}</span> },
     { key: 'itemsSummary', label: 'Items', defaultWidth: 220, className: 'text-gray-600' },
     { key: 'discountCode.code', label: 'Code', defaultWidth: 110, render: (r: any) => <span className="font-mono text-xs text-gray-500">{r.discountCode?.code || '—'}</span> },
     { key: 'discountCode.affiliate.name', label: 'Affiliate', defaultWidth: 130, render: (r: any) => r.discountCode?.affiliate?.name || '—', className: 'text-gray-600' },

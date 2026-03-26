@@ -299,6 +299,7 @@ router.get('/orders', async (req: Request, res: Response) => {
       const s = search as string;
       where.OR = [
         { customerFirstName: { contains: s, mode: 'insensitive' } },
+        { customerLastName: { contains: s, mode: 'insensitive' } },
         { itemsSummary: { contains: s, mode: 'insensitive' } },
         { externalOrderId: { contains: s, mode: 'insensitive' } },
         { discountCode: { code: { contains: s, mode: 'insensitive' } } },
