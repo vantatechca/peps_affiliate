@@ -66,11 +66,17 @@ export default function AffiliateDashboard() {
   const [period, setPeriod] = useState('month');
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - day + (day === 0 ? -6 : 1));
+    return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
   });
   const [endDate, setEndDate] = useState(() => {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const day = now.getDay();
+    const sunday = new Date(now);
+    sunday.setDate(now.getDate() - day + (day === 0 ? 0 : 7));
+    return `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
   });
   const [tab, setTab] = useState<'overview' | 'orders' | 'codes'>('overview');
   const [loading, setLoading] = useState(true);
