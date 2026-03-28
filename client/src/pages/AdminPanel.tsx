@@ -4,6 +4,8 @@ import { api } from '../api';
 import { downloadBusinessOverviewPDF } from '../pdfReport';
 import DataTable, { Column } from '../components/DataTable';
 import OrderDetailModal from '../components/OrderDetailModal';
+import ConfirmModal from '../components/ConfirmModal';
+import { useConfirm } from '../hooks/useConfirm';
 import Tutorial, { TutorialStep } from '../components/Tutorial';
 import ThemeToggle from '../components/ThemeToggle';
 import ViewAsModal from '../components/ViewAsModal';
@@ -468,6 +470,7 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
   const [form, setForm] = useState({ name: '', email: '', password: '', defaultCommissionRate: '20' });
   const [selectedAffiliate, setSelectedAffiliate] = useState<string>('');
   const [perfStats, setPerfStats] = useState<any>(null);
+  const { confirmProps, confirm } = useConfirm();
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [topAffiliates, setTopAffiliates] = useState<any[]>([]);
@@ -511,13 +514,25 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
 
   async function toggleActive(aff: any) { await api.updateAffiliate(aff.id, { active: !aff.active }); loadAffiliates(); }
   async function handleDelete(aff: any) {
-    if (!confirm(`Delete affiliate "${aff.name}"?`)) return;
+    const ok = await confirm({
+      title: 'Delete Affiliate',
+      message: `Are you sure you want to delete "${aff.name}"? This will also delete their codes and orders.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await api.deleteAffiliate(aff.id); loadAffiliates();
   }
 
   async function handleBatchDelete() {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} selected affiliate(s)? This will also delete their codes and orders.`)) return;
+    const ok = await confirm({
+      title: 'Delete Affiliates',
+      message: `Delete ${selectedIds.size} selected affiliate(s)? This will also delete their codes and orders. This cannot be undone.`,
+      confirmLabel: `Delete ${selectedIds.size} Affiliate(s)`,
+      variant: 'danger',
+    });
+    if (!ok) return;
     await api.batchDeleteAffiliates(Array.from(selectedIds));
     setSelectedIds(new Set());
     loadAffiliates();
@@ -790,6 +805,7 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
           </div>
         </div>
       )}
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 }
@@ -803,6 +819,7 @@ function CodesTab() {
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ code: '', affiliateId: '', discountPercent: '10', commissionRateOverride: '', label: '', expiresAt: '' });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const { confirmProps, confirm } = useConfirm();
 
   useEffect(() => { loadCodes(); api.getAffiliates().then(setAffiliates); }, []);
   async function loadCodes() { setCodes(await api.getCodes()); }
@@ -836,11 +853,16 @@ function CodesTab() {
   }
 
   async function toggleActive(c: any) { await api.updateCode(c.id, { active: !c.active }); loadCodes(); }
-  async function handleDelete(c: any) { if (!confirm(`Delete code "${c.code}"?`)) return; await api.deleteCode(c.id); loadCodes(); }
+  async function handleDelete(c: any) {
+    const ok = await confirm({ title: 'Delete Code', message: `Are you sure you want to delete code "${c.code}"? This cannot be undone.`, confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
+    await api.deleteCode(c.id); loadCodes();
+  }
 
   async function handleBatchDelete() {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} selected code(s)? This cannot be undone.`)) return;
+    const ok = await confirm({ title: 'Delete Codes', message: `Delete ${selectedIds.size} selected code(s)? This cannot be undone.`, confirmLabel: `Delete ${selectedIds.size} Code(s)`, variant: 'danger' });
+    if (!ok) return;
     await api.batchDeleteCodes(Array.from(selectedIds));
     setSelectedIds(new Set());
     loadCodes();
@@ -959,6 +981,7 @@ function CodesTab() {
           ) : undefined}
         />
       </div>
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 }
@@ -980,6 +1003,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [filter, setFilter] = useState<'all' | 'yes' | 'no'>('all');
   const [search, setSearch] = useState('');
+  const { confirmProps, confirm } = useConfirm();
   const [searchDebounced, setSearchDebounced] = useState('');
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
@@ -1038,14 +1062,16 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this order? This cannot be undone.')) return;
+    const ok = await confirm({ title: 'Delete Order', message: 'Are you sure you want to delete this order? This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     await api.deleteOrder(id);
     loadOrders();
   }
 
   async function handleBatchDelete() {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} selected order(s)? This cannot be undone.`)) return;
+    const ok = await confirm({ title: 'Delete Orders', message: `Delete ${selectedIds.size} selected order(s)? This cannot be undone.`, confirmLabel: `Delete ${selectedIds.size} Order(s)`, variant: 'danger' });
+    if (!ok) return;
     await api.batchDeleteOrders(Array.from(selectedIds));
     setSelectedIds(new Set());
     loadOrders();
@@ -1214,6 +1240,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
           onUpdated={(updated) => { setSelectedOrder(updated); loadOrders(); }}
         />
       )}
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 }
@@ -1315,6 +1342,7 @@ function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'ADMIN' });
+  const { confirmProps, confirm } = useConfirm();
 
   useEffect(() => { loadAdmins(); }, []);
   async function loadAdmins() { setAdmins(await api.getAdmins()); }
@@ -1351,8 +1379,12 @@ function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
   }
 
   async function handleDelete(admin: any) {
-    if (admin.id === user?.id) { alert("Can't delete your own account"); return; }
-    if (!confirm(`Delete admin "${admin.name}"?`)) return;
+    if (admin.id === user?.id) {
+      await confirm({ title: 'Cannot Delete', message: "You can't delete your own account.", confirmLabel: 'OK', variant: 'warning' });
+      return;
+    }
+    const ok = await confirm({ title: 'Delete Admin', message: `Are you sure you want to delete admin "${admin.name}"? This cannot be undone.`, confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     await api.deleteAdmin(admin.id);
     loadAdmins();
   }
@@ -1435,6 +1467,7 @@ function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
           searchPlaceholder="Search admins..."
         />
       </div>
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 }
