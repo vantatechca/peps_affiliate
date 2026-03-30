@@ -127,6 +127,7 @@ export const api = {
 
   adminStats: (affiliateId?: string) =>
     request(`/admin/stats${affiliateId ? `?affiliateId=${affiliateId}` : ''}`),
+  getStores: () => request('/admin/stores') as Promise<string[]>,
 
   // Super Admin
   getAdmins: () => request('/super/admins'),

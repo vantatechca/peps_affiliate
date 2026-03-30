@@ -1023,6 +1023,9 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [storeNameFilter, setStoreNameFilter] = useState('');
   const [storeNameDebounced, setStoreNameDebounced] = useState('');
   const [currencyFilter, setCurrencyFilter] = useState('');
+  const [storeNames, setStoreNames] = useState<string[]>([]);
+  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+  const storeDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const searchTimer = useRef<any>(null);
   const storeNameTimer = useRef<any>(null);
@@ -1045,6 +1048,14 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
     }, 400);
   }
 
+  useEffect(() => { api.getStores().then(setStoreNames).catch(() => {}); }, []);
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (storeDropdownRef.current && !storeDropdownRef.current.contains(e.target as Node)) setShowStoreDropdown(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   useEffect(() => { setPage(1); }, [filter, startDate, endDate, sourceFilter, storeNameDebounced, currencyFilter]);
   useEffect(() => { loadOrders(); }, [page, filter, searchDebounced, startDate, endDate, sourceFilter, storeNameDebounced, currencyFilter]);
 
@@ -1172,8 +1183,32 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
             <option value="wordpress">WordPress</option>
             <option value="stripe">Stripe</option>
           </select>
-          <input type="text" value={storeNameFilter} onChange={(e) => handleStoreNameFilter(e.target.value)}
-            placeholder="Filter by store..." className="text-sm border border-gray-300 rounded px-2 py-1 w-32 sm:w-40" />
+          <div className="relative" ref={storeDropdownRef}>
+            <input type="text" value={storeNameFilter}
+              onChange={(e) => { handleStoreNameFilter(e.target.value); setShowStoreDropdown(true); }}
+              onFocus={() => setShowStoreDropdown(true)}
+              placeholder="Filter by store..."
+              className="text-sm border border-gray-300 rounded px-2 py-1 w-32 sm:w-44 pr-6" />
+            {storeNameFilter && (
+              <button onClick={() => { handleStoreNameFilter(''); setShowStoreDropdown(false); }}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs leading-none">&times;</button>
+            )}
+            {showStoreDropdown && storeNames.length > 0 && (
+              <div className="absolute z-50 top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {storeNames
+                  .filter(s => !storeNameFilter || s.toLowerCase().includes(storeNameFilter.toLowerCase()))
+                  .map(store => (
+                    <button key={store} onClick={() => { handleStoreNameFilter(store); setShowStoreDropdown(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 ${storeNameFilter === store ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}>
+                      {store}
+                    </button>
+                  ))}
+                {storeNames.filter(s => !storeNameFilter || s.toLowerCase().includes(storeNameFilter.toLowerCase())).length === 0 && (
+                  <p className="px-3 py-2 text-xs text-gray-400">No matching stores</p>
+                )}
+              </div>
+            )}
+          </div>
           <select value={currencyFilter} onChange={(e) => setCurrencyFilter(e.target.value)}
             className="text-sm border border-gray-300 rounded px-2 py-1">
             <option value="">All Currencies</option>
