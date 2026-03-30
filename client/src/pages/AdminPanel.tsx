@@ -4,6 +4,8 @@ import { api } from '../api';
 import { downloadBusinessOverviewPDF } from '../pdfReport';
 import DataTable, { Column } from '../components/DataTable';
 import OrderDetailModal from '../components/OrderDetailModal';
+import ConfirmModal from '../components/ConfirmModal';
+import { useConfirm } from '../hooks/useConfirm';
 import Tutorial, { TutorialStep } from '../components/Tutorial';
 import ThemeToggle from '../components/ThemeToggle';
 import ViewAsModal from '../components/ViewAsModal';
@@ -468,6 +470,7 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
   const [form, setForm] = useState({ name: '', email: '', password: '', defaultCommissionRate: '20' });
   const [selectedAffiliate, setSelectedAffiliate] = useState<string>('');
   const [perfStats, setPerfStats] = useState<any>(null);
+  const { confirmProps, confirm } = useConfirm();
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [topAffiliates, setTopAffiliates] = useState<any[]>([]);
@@ -511,13 +514,25 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
 
   async function toggleActive(aff: any) { await api.updateAffiliate(aff.id, { active: !aff.active }); loadAffiliates(); }
   async function handleDelete(aff: any) {
-    if (!confirm(`Delete affiliate "${aff.name}"?`)) return;
+    const ok = await confirm({
+      title: 'Delete Affiliate',
+      message: `Are you sure you want to delete "${aff.name}"? This will also delete their codes and orders.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await api.deleteAffiliate(aff.id); loadAffiliates();
   }
 
   async function handleBatchDelete() {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} selected affiliate(s)? This will also delete their codes and orders.`)) return;
+    const ok = await confirm({
+      title: 'Delete Affiliates',
+      message: `Delete ${selectedIds.size} selected affiliate(s)? This will also delete their codes and orders. This cannot be undone.`,
+      confirmLabel: `Delete ${selectedIds.size} Affiliate(s)`,
+      variant: 'danger',
+    });
+    if (!ok) return;
     await api.batchDeleteAffiliates(Array.from(selectedIds));
     setSelectedIds(new Set());
     loadAffiliates();
@@ -790,6 +805,7 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
           </div>
         </div>
       )}
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 }
@@ -803,6 +819,7 @@ function CodesTab() {
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ code: '', affiliateId: '', discountPercent: '10', commissionRateOverride: '', label: '', expiresAt: '' });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const { confirmProps, confirm } = useConfirm();
 
   useEffect(() => { loadCodes(); api.getAffiliates().then(setAffiliates); }, []);
   async function loadCodes() { setCodes(await api.getCodes()); }
@@ -836,11 +853,16 @@ function CodesTab() {
   }
 
   async function toggleActive(c: any) { await api.updateCode(c.id, { active: !c.active }); loadCodes(); }
-  async function handleDelete(c: any) { if (!confirm(`Delete code "${c.code}"?`)) return; await api.deleteCode(c.id); loadCodes(); }
+  async function handleDelete(c: any) {
+    const ok = await confirm({ title: 'Delete Code', message: `Are you sure you want to delete code "${c.code}"? This cannot be undone.`, confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
+    await api.deleteCode(c.id); loadCodes();
+  }
 
   async function handleBatchDelete() {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} selected code(s)? This cannot be undone.`)) return;
+    const ok = await confirm({ title: 'Delete Codes', message: `Delete ${selectedIds.size} selected code(s)? This cannot be undone.`, confirmLabel: `Delete ${selectedIds.size} Code(s)`, variant: 'danger' });
+    if (!ok) return;
     await api.batchDeleteCodes(Array.from(selectedIds));
     setSelectedIds(new Set());
     loadCodes();
@@ -959,6 +981,7 @@ function CodesTab() {
           ) : undefined}
         />
       </div>
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 }
@@ -980,6 +1003,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [filter, setFilter] = useState<'all' | 'yes' | 'no'>('all');
   const [search, setSearch] = useState('');
+  const { confirmProps, confirm } = useConfirm();
   const [searchDebounced, setSearchDebounced] = useState('');
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
@@ -999,6 +1023,9 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [storeNameFilter, setStoreNameFilter] = useState('');
   const [storeNameDebounced, setStoreNameDebounced] = useState('');
   const [currencyFilter, setCurrencyFilter] = useState('');
+  const [storeNames, setStoreNames] = useState<string[]>([]);
+  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+  const storeDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const searchTimer = useRef<any>(null);
   const storeNameTimer = useRef<any>(null);
@@ -1021,6 +1048,14 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
     }, 400);
   }
 
+  useEffect(() => { api.getStores().then(setStoreNames).catch(() => {}); }, []);
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (storeDropdownRef.current && !storeDropdownRef.current.contains(e.target as Node)) setShowStoreDropdown(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   useEffect(() => { setPage(1); }, [filter, startDate, endDate, sourceFilter, storeNameDebounced, currencyFilter]);
   useEffect(() => { loadOrders(); }, [page, filter, searchDebounced, startDate, endDate, sourceFilter, storeNameDebounced, currencyFilter]);
 
@@ -1038,14 +1073,16 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this order? This cannot be undone.')) return;
+    const ok = await confirm({ title: 'Delete Order', message: 'Are you sure you want to delete this order? This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     await api.deleteOrder(id);
     loadOrders();
   }
 
   async function handleBatchDelete() {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} selected order(s)? This cannot be undone.`)) return;
+    const ok = await confirm({ title: 'Delete Orders', message: `Delete ${selectedIds.size} selected order(s)? This cannot be undone.`, confirmLabel: `Delete ${selectedIds.size} Order(s)`, variant: 'danger' });
+    if (!ok) return;
     await api.batchDeleteOrders(Array.from(selectedIds));
     setSelectedIds(new Set());
     loadOrders();
@@ -1146,8 +1183,32 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
             <option value="wordpress">WordPress</option>
             <option value="stripe">Stripe</option>
           </select>
-          <input type="text" value={storeNameFilter} onChange={(e) => handleStoreNameFilter(e.target.value)}
-            placeholder="Filter by store..." className="text-sm border border-gray-300 rounded px-2 py-1 w-32 sm:w-40" />
+          <div className="relative" ref={storeDropdownRef}>
+            <input type="text" value={storeNameFilter}
+              onChange={(e) => { handleStoreNameFilter(e.target.value); setShowStoreDropdown(true); }}
+              onFocus={() => setShowStoreDropdown(true)}
+              placeholder="Filter by store..."
+              className="text-sm border border-gray-300 rounded px-2 py-1 w-32 sm:w-44 pr-6" />
+            {storeNameFilter && (
+              <button onClick={() => { handleStoreNameFilter(''); setShowStoreDropdown(false); }}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs leading-none">&times;</button>
+            )}
+            {showStoreDropdown && storeNames.length > 0 && (
+              <div className="absolute z-50 top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {storeNames
+                  .filter(s => !storeNameFilter || s.toLowerCase().includes(storeNameFilter.toLowerCase()))
+                  .map(store => (
+                    <button key={store} onClick={() => { handleStoreNameFilter(store); setShowStoreDropdown(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 ${storeNameFilter === store ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}>
+                      {store}
+                    </button>
+                  ))}
+                {storeNames.filter(s => !storeNameFilter || s.toLowerCase().includes(storeNameFilter.toLowerCase())).length === 0 && (
+                  <p className="px-3 py-2 text-xs text-gray-400">No matching stores</p>
+                )}
+              </div>
+            )}
+          </div>
           <select value={currencyFilter} onChange={(e) => setCurrencyFilter(e.target.value)}
             className="text-sm border border-gray-300 rounded px-2 py-1">
             <option value="">All Currencies</option>
@@ -1214,6 +1275,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
           onUpdated={(updated) => { setSelectedOrder(updated); loadOrders(); }}
         />
       )}
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 }
@@ -1315,6 +1377,7 @@ function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'ADMIN' });
+  const { confirmProps, confirm } = useConfirm();
 
   useEffect(() => { loadAdmins(); }, []);
   async function loadAdmins() { setAdmins(await api.getAdmins()); }
@@ -1351,8 +1414,12 @@ function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
   }
 
   async function handleDelete(admin: any) {
-    if (admin.id === user?.id) { alert("Can't delete your own account"); return; }
-    if (!confirm(`Delete admin "${admin.name}"?`)) return;
+    if (admin.id === user?.id) {
+      await confirm({ title: 'Cannot Delete', message: "You can't delete your own account.", confirmLabel: 'OK', variant: 'warning' });
+      return;
+    }
+    const ok = await confirm({ title: 'Delete Admin', message: `Are you sure you want to delete admin "${admin.name}"? This cannot be undone.`, confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     await api.deleteAdmin(admin.id);
     loadAdmins();
   }
@@ -1435,6 +1502,7 @@ function AdminsTab({ onViewAs }: { onViewAs: (id: string) => void }) {
           searchPlaceholder="Search admins..."
         />
       </div>
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 }

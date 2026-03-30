@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api';
+import ConfirmModal from './ConfirmModal';
+import { useConfirm } from '../hooks/useConfirm';
 
 interface OrderDetailProps {
   order: any;
@@ -25,6 +27,7 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
   const [editStoreName, setEditStoreName] = useState(order?.storeName || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { confirmProps, confirm } = useConfirm();
 
   if (!order) return null;
 
@@ -42,6 +45,8 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
   }
 
   async function handleSave() {
+    const ok = await confirm({ title: 'Save Changes', message: 'Are you sure you want to save these changes?', confirmLabel: 'Save', variant: 'info' });
+    if (!ok) return;
     setSaving(true);
     setError('');
     try {
@@ -223,7 +228,10 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 sm:px-6 py-3 flex justify-between rounded-b-lg">
           {isAdmin && onDelete ? (
             <button
-              onClick={() => { onDelete(order.id); onClose(); }}
+              onClick={async () => {
+                const ok = await confirm({ title: 'Delete Order', message: 'Are you sure you want to delete this order? This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' });
+                if (ok) { onDelete(order.id); onClose(); }
+              }}
               className="text-sm text-red-500 hover:text-red-700 font-medium"
             >
               Delete Order
@@ -233,6 +241,7 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
             Close
           </button>
         </div>
+        <ConfirmModal {...confirmProps} />
       </div>
     </div>
   );

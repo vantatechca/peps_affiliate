@@ -125,3 +125,10 @@ body {
 .dark .hover\:bg-gray-300:hover { background-color: #4b5563 !important; }
 .dark .active\:bg-gray-400:active { background-color: #6b7280 !important; }
 
+/* ============ ANIMATIONS ============ */
+
+@keyframes fadeScaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+

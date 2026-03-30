@@ -485,4 +485,20 @@ router.get('/stats', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/stores — distinct store names for filter dropdown
+router.get('/stores', async (_req: Request, res: Response) => {
+  try {
+    const stores = await prisma.order.findMany({
+      where: { storeName: { not: null } },
+      select: { storeName: true },
+      distinct: ['storeName'],
+      orderBy: { storeName: 'asc' },
+    });
+    res.json(stores.map(s => s.storeName).filter(Boolean));
+  } catch (error) {
+    console.error('Get stores error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
