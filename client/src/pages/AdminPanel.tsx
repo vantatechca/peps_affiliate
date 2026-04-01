@@ -1006,11 +1006,6 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [search, setSearch] = useState('');
   const { confirmProps, confirm } = useConfirm();
   const [searchDebounced, setSearchDebounced] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [addForm, setAddForm] = useState({ customerFirstName: '', customerLastName: '', itemsSummary: '', orderTotal: '', discountCodeId: '', source: 'manual', storeName: '', currency: 'USD', externalOrderId: '' });
-  const [addError, setAddError] = useState('');
-  const [addSaving, setAddSaving] = useState(false);
-  const [codes, setCodes] = useState<any[]>([]);
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
     const day = now.getDay();
@@ -1055,7 +1050,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
     }, 400);
   }
 
-  useEffect(() => { api.getStores().then(setStoreNames).catch(() => {}); if (isSuperAdmin) api.getCodes().then(setCodes).catch(() => {}); }, []);
+  useEffect(() => { api.getStores().then(setStoreNames).catch(() => {}); }, []);
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (storeDropdownRef.current && !storeDropdownRef.current.contains(e.target as Node)) setShowStoreDropdown(false);
@@ -1113,32 +1108,6 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
       o.attributed ? 'Yes' : 'No',
     ]);
     downloadCSV(rows, headers, `orders-${new Date().toISOString().split('T')[0]}.csv`);
-  }
-
-  async function handleAddOrder(e: FormEvent) {
-    e.preventDefault();
-    setAddSaving(true);
-    setAddError('');
-    try {
-      await api.createOrder({
-        customerFirstName: addForm.customerFirstName,
-        customerLastName: addForm.customerLastName || undefined,
-        itemsSummary: addForm.itemsSummary,
-        orderTotal: parseFloat(addForm.orderTotal),
-        discountCodeId: addForm.discountCodeId || undefined,
-        source: addForm.source,
-        storeName: addForm.storeName || undefined,
-        currency: addForm.currency,
-        externalOrderId: addForm.externalOrderId || undefined,
-      });
-      setShowAddForm(false);
-      setAddForm({ customerFirstName: '', customerLastName: '', itemsSummary: '', orderTotal: '', discountCodeId: '', source: 'manual', storeName: '', currency: 'USD', externalOrderId: '' });
-      loadOrders();
-    } catch (err: any) {
-      setAddError(err.message || 'Failed to create order');
-    } finally {
-      setAddSaving(false);
-    }
   }
 
   const columns: Column[] = [
@@ -1271,12 +1240,6 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
             className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">
             Download CSV
           </button>
-          {isSuperAdmin && (
-            <button onClick={() => setShowAddForm(true)}
-              className="text-sm bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-gray-800">
-              Add Order
-            </button>
-          )}
         </div>
       </div>
 
@@ -1309,69 +1272,6 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
           </div>
         )}
       </div>
-
-      {showAddForm && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-          <div className="fixed inset-0 bg-black bg-opacity-40" onClick={() => setShowAddForm(false)} />
-          <div className="relative bg-white rounded-t-xl sm:rounded-lg border border-gray-200 w-full sm:max-w-lg sm:mx-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-gray-900">Add Order</h3>
-              <button onClick={() => setShowAddForm(false)} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
-            </div>
-            {addError && <p className="text-xs text-red-600 mb-3">{addError}</p>}
-            <form onSubmit={handleAddOrder} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="First Name *" value={addForm.customerFirstName} onChange={(v) => setAddForm({ ...addForm, customerFirstName: v })} required placeholder="John" />
-                <Input label="Last Name" value={addForm.customerLastName} onChange={(v) => setAddForm({ ...addForm, customerLastName: v })} placeholder="Doe" />
-              </div>
-              <Input label="Items Summary *" value={addForm.itemsSummary} onChange={(v) => setAddForm({ ...addForm, itemsSummary: v })} required placeholder="e.g. 2x Widget, 1x Gadget" />
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Order Total *" type="number" value={addForm.orderTotal} onChange={(v) => setAddForm({ ...addForm, orderTotal: v })} required placeholder="0.00" />
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Currency</label>
-                  <select value={addForm.currency} onChange={(e) => setAddForm({ ...addForm, currency: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900">
-                    <option value="USD">USD</option>
-                    <option value="CAD">CAD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Discount Code (optional)</label>
-                <select value={addForm.discountCodeId} onChange={(e) => setAddForm({ ...addForm, discountCodeId: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900">
-                  <option value="">None</option>
-                  {codes.map((c) => (
-                    <option key={c.id} value={c.id}>{c.code} — {c.affiliate?.name || 'Unknown'}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Source</label>
-                  <select value={addForm.source} onChange={(e) => setAddForm({ ...addForm, source: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900">
-                    <option value="manual">Manual</option>
-                    <option value="shopify">Shopify</option>
-                    <option value="wordpress">WordPress</option>
-                    <option value="stripe">Stripe</option>
-                  </select>
-                </div>
-                <Input label="Store Name" value={addForm.storeName} onChange={(v) => setAddForm({ ...addForm, storeName: v })} placeholder="Optional" />
-              </div>
-              <Input label="External Order ID" value={addForm.externalOrderId} onChange={(v) => setAddForm({ ...addForm, externalOrderId: v })} placeholder="Optional" />
-              <div className="flex gap-2 pt-2">
-                <button type="submit" disabled={addSaving} className="flex-1 bg-gray-900 text-white text-sm px-4 py-2.5 rounded hover:bg-gray-800 font-medium disabled:opacity-50">
-                  {addSaving ? 'Creating...' : 'Create Order'}
-                </button>
-                <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 text-sm text-gray-600 px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50">Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {selectedOrder && (
         <OrderDetailModal
