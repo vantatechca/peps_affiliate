@@ -183,6 +183,7 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Source</label>
                   <select value={form.source} onChange={(e) => updateForm('source', e.target.value)} className={inputClass}>
+                    <option value="manual">Manual</option>
                     <option value="shopify">Shopify</option>
                     <option value="wordpress">WordPress</option>
                     <option value="stripe">Stripe</option>

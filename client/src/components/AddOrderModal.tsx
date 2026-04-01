@@ -13,12 +13,10 @@ export default function AddOrderModal({ onClose, onCreated }: AddOrderModalProps
   const [customerLastName, setCustomerLastName] = useState('');
   const [itemsSummary, setItemsSummary] = useState('');
   const [orderTotal, setOrderTotal] = useState('');
-  const [commissionEarned, setCommissionEarned] = useState('');
   const [discountCodeId, setDiscountCodeId] = useState('');
-  const [source, setSource] = useState('shopify');
+  const [source, setSource] = useState('manual');
   const [storeName, setStoreName] = useState('');
   const [currency, setCurrency] = useState('USD');
-  const [attributed, setAttributed] = useState(false);
   const [createdAt, setCreatedAt] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -49,12 +47,10 @@ export default function AddOrderModal({ onClose, onCreated }: AddOrderModalProps
         customerLastName: customerLastName.trim() || null,
         itemsSummary: itemsSummary.trim(),
         orderTotal: parseFloat(orderTotal),
-        commissionEarned: commissionEarned ? parseFloat(commissionEarned) : 0,
         discountCodeId: discountCodeId || null,
         source,
         storeName: storeName.trim() || null,
         currency,
-        attributed,
         createdAt: createdAt ? new Date(createdAt).toISOString() : undefined,
       });
       onCreated(order);
@@ -104,17 +100,11 @@ export default function AddOrderModal({ onClose, onCreated }: AddOrderModalProps
               className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Order Total *</label>
-              <input type="number" step="0.01" value={orderTotal} onChange={(e) => setOrderTotal(e.target.value)}
-                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Commission</label>
-              <input type="number" step="0.01" value={commissionEarned} onChange={(e) => setCommissionEarned(e.target.value)}
-                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500" />
-            </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Order Total *</label>
+            <input type="number" step="0.01" value={orderTotal} onChange={(e) => setOrderTotal(e.target.value)}
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500" />
+            {discountCodeId && <p className="text-xs text-gray-400 mt-1">Commission will be auto-calculated from the discount code</p>}
           </div>
 
           <div>
@@ -133,6 +123,7 @@ export default function AddOrderModal({ onClose, onCreated }: AddOrderModalProps
               <label className="text-xs text-gray-500 block mb-1">Source</label>
               <select value={source} onChange={(e) => setSource(e.target.value)}
                 className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500">
+                <option value="manual">Manual</option>
                 <option value="shopify">Shopify</option>
                 <option value="wordpress">WordPress</option>
                 <option value="stripe">Stripe</option>
@@ -158,12 +149,6 @@ export default function AddOrderModal({ onClose, onCreated }: AddOrderModalProps
               </select>
             </div>
           </div>
-
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked={attributed} onChange={(e) => setAttributed(e.target.checked)}
-              className="rounded border-gray-300" />
-            Attributed
-          </label>
         </div>
 
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 sm:px-6 py-3 flex justify-end gap-2 rounded-b-lg">
