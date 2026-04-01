@@ -254,7 +254,94 @@ router.get('/all-users', async (_req: Request, res: Response) => {
   }
 });
 
-// ============ ORDER EDITING ============
+// ============ ORDERS ============
+
+// POST /api/super/orders — manually create an order
+router.post('/orders', async (req: Request, res: Response) => {
+  try {
+    const {
+      customerFirstName,
+      customerLastName,
+      itemsSummary,
+      orderTotal,
+      discountCodeId,
+      source = 'manual',
+      storeName,
+      currency = 'USD',
+      externalOrderId,
+    } = req.body;
+
+    if (!customerFirstName || !orderTotal || !itemsSummary) {
+      return res.status(400).json({ error: 'customerFirstName, itemsSummary, and orderTotal are required' });
+    }
+
+    let attributed = false;
+    let commissionEarned = 0;
+
+    // Calculate commission if a discount code is provided
+    if (discountCodeId) {
+      const discountCode = await prisma.discountCode.findUnique({
+        where: { id: discountCodeId },
+        include: { affiliate: true },
+      });
+
+      if (discountCode && discountCode.active && discountCode.affiliate.active) {
+        const now = new Date();
+        const isNotExpired = !discountCode.expiresAt || discountCode.expiresAt > now;
+
+        if (isNotExpired) {
+          attributed = true;
+          const commissionRate =
+            discountCode.commissionRateOverride ??
+            discountCode.affiliate.defaultCommissionRate ??
+            0.20;
+          commissionEarned = parseFloat((parseFloat(String(orderTotal)) * commissionRate).toFixed(2));
+        }
+      }
+    }
+
+    const order = await prisma.order.create({
+      data: {
+        customerFirstName,
+        customerLastName: customerLastName || null,
+        itemsSummary,
+        orderTotal: parseFloat(String(orderTotal)),
+        discountCodeId: discountCodeId || null,
+        commissionEarned,
+        attributed,
+        source,
+        storeName: storeName || null,
+        currency: currency.toUpperCase(),
+        externalOrderId: externalOrderId || null,
+      },
+      include: {
+        discountCode: {
+          include: { affiliate: { select: { id: true, name: true } } },
+        },
+      },
+    });
+
+    logAudit({
+      ...auditFromReq(req),
+      action: 'CREATE_ORDER',
+      entity: 'Order',
+      entityId: order.id,
+      details: {
+        customerFirstName,
+        orderTotal: order.orderTotal,
+        source: order.source,
+        attributed: order.attributed,
+        commissionEarned: order.commissionEarned,
+      },
+    });
+
+    res.status(201).json(order);
+  } catch (error) {
+    console.error('Create order error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Create order error', details: { error: String(error) } });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // PATCH /api/super/orders/:id  — edit currency, source, storeName
 router.patch('/orders/:id', async (req: Request, res: Response) => {
