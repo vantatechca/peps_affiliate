@@ -343,16 +343,25 @@ router.post('/orders', async (req: Request, res: Response) => {
   }
 });
 
-// PATCH /api/super/orders/:id  — edit currency, source, storeName
+// PATCH /api/super/orders/:id  — edit all order fields (super admin)
 router.patch('/orders/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { currency, source, storeName } = req.body;
+    const { currency, source, storeName, createdAt, customerFirstName, customerLastName, itemsSummary, orderTotal, commissionEarned, attributed, discountCodeId, externalOrderId } = req.body;
 
     const data: any = {};
     if (currency !== undefined) data.currency = currency;
     if (source !== undefined) data.source = source;
     if (storeName !== undefined) data.storeName = storeName || null;
+    if (createdAt !== undefined) data.createdAt = new Date(createdAt);
+    if (customerFirstName !== undefined) data.customerFirstName = customerFirstName;
+    if (customerLastName !== undefined) data.customerLastName = customerLastName || null;
+    if (itemsSummary !== undefined) data.itemsSummary = itemsSummary;
+    if (orderTotal !== undefined) data.orderTotal = parseFloat(orderTotal);
+    if (commissionEarned !== undefined) data.commissionEarned = parseFloat(commissionEarned);
+    if (attributed !== undefined) data.attributed = attributed;
+    if (discountCodeId !== undefined) data.discountCodeId = discountCodeId || null;
+    if (externalOrderId !== undefined) data.externalOrderId = externalOrderId || null;
 
     if (Object.keys(data).length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
@@ -380,6 +389,52 @@ router.patch('/orders/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Edit order error:', error);
     logSystem({ level: 'ERROR', source: 'API', message: 'Edit order error', details: { error: String(error), orderId: req.params.id } });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/super/orders — manually create an order
+router.post('/orders', async (req: Request, res: Response) => {
+  try {
+    const { customerFirstName, customerLastName, itemsSummary, orderTotal, commissionEarned, discountCodeId, source, storeName, currency, attributed, createdAt } = req.body;
+
+    if (!customerFirstName || !itemsSummary || orderTotal === undefined) {
+      return res.status(400).json({ error: 'customerFirstName, itemsSummary, and orderTotal are required' });
+    }
+
+    const order = await prisma.order.create({
+      data: {
+        customerFirstName,
+        customerLastName: customerLastName || null,
+        itemsSummary,
+        orderTotal: parseFloat(orderTotal),
+        commissionEarned: commissionEarned ? parseFloat(commissionEarned) : 0,
+        discountCodeId: discountCodeId || null,
+        source: source || 'shopify',
+        storeName: storeName || null,
+        currency: currency || 'USD',
+        attributed: attributed ?? false,
+        createdAt: createdAt ? new Date(createdAt) : new Date(),
+      },
+      include: {
+        discountCode: {
+          include: { affiliate: { select: { id: true, name: true } } },
+        },
+      },
+    });
+
+    logAudit({
+      ...auditFromReq(req),
+      action: 'CREATE_ORDER',
+      entity: 'Order',
+      entityId: order.id,
+      details: { customerFirstName, itemsSummary, orderTotal, source: source || 'shopify' },
+    });
+
+    res.status(201).json(order);
+  } catch (error) {
+    console.error('Create order error:', error);
+    logSystem({ level: 'ERROR', source: 'API', message: 'Create order error', details: { error: String(error) } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
