@@ -199,6 +199,7 @@ router.get('/valid-codes', async (_req: Request, res: Response) => {
       };
     }
     res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=60');
     res.json(valid);
   } catch (error) {
     console.error('Valid codes error:', error);
