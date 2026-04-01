@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../api';
 import ConfirmModal from './ConfirmModal';
 import { useConfirm } from '../hooks/useConfirm';
@@ -20,20 +20,39 @@ function formatDateTime(d: string) {
   });
 }
 
+function toLocalDatetime(d: string) {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}T${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+}
+
 export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin, onDelete, onUpdated }: OrderDetailProps) {
   const [editing, setEditing] = useState(false);
-  const [editSource, setEditSource] = useState(order?.source || '');
-  const [editCurrency, setEditCurrency] = useState(order?.currency || 'USD');
-  const [editStoreName, setEditStoreName] = useState(order?.storeName || '');
-  const [editDate, setEditDate] = useState(() => {
-    const d = order?.createdAt || order?.date;
-    if (!d) return '';
-    const dt = new Date(d);
-    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}T${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+  const [form, setForm] = useState({
+    createdAt: '',
+    customerFirstName: '',
+    customerLastName: '',
+    itemsSummary: '',
+    orderTotal: '',
+    commissionEarned: '',
+    discountCodeId: '',
+    source: '',
+    storeName: '',
+    currency: '',
+    attributed: false,
+    externalOrderId: '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [codes, setCodes] = useState<any[]>([]);
+  const [storeNames, setStoreNames] = useState<string[]>([]);
   const { confirmProps, confirm } = useConfirm();
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      api.getCodes().then(setCodes).catch(() => {});
+      api.getStores().then(setStoreNames).catch(() => {});
+    }
+  }, [isSuperAdmin]);
 
   if (!order) return null;
 
@@ -43,29 +62,52 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
   const codeLabel = isAdmin ? order.discountCode?.label : order.codeLabel;
 
   function startEdit() {
-    setEditSource(order.source || '');
-    setEditCurrency(order.currency || 'USD');
-    setEditStoreName(order.storeName || '');
     const d = order.createdAt || order.date;
-    if (d) {
-      const dt = new Date(d);
-      setEditDate(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}T${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`);
-    }
+    setForm({
+      createdAt: d ? toLocalDatetime(d) : '',
+      customerFirstName: order.customerFirstName || '',
+      customerLastName: order.customerLastName || '',
+      itemsSummary: order.itemsSummary || '',
+      orderTotal: String(order.orderTotal ?? ''),
+      commissionEarned: String(order.commissionEarned ?? ''),
+      discountCodeId: order.discountCodeId || order.discountCode?.id || '',
+      source: order.source || 'shopify',
+      storeName: order.storeName || '',
+      currency: order.currency || 'USD',
+      attributed: order.attributed ?? false,
+      externalOrderId: order.externalOrderId || '',
+    });
     setError('');
     setEditing(true);
   }
 
+  function updateForm(field: string, value: any) {
+    setForm(prev => ({ ...prev, [field]: value }));
+  }
+
   async function handleSave() {
+    if (!form.customerFirstName.trim() || !form.itemsSummary.trim() || !form.orderTotal) {
+      setError('Customer first name, items, and order total are required');
+      return;
+    }
     const ok = await confirm({ title: 'Save Changes', message: 'Are you sure you want to save these changes?', confirmLabel: 'Save', variant: 'info' });
     if (!ok) return;
     setSaving(true);
     setError('');
     try {
       const updated = await api.updateOrder(order.id, {
-        source: editSource,
-        currency: editCurrency,
-        storeName: editStoreName,
-        createdAt: editDate ? new Date(editDate).toISOString() : undefined,
+        createdAt: form.createdAt ? new Date(form.createdAt).toISOString() : undefined,
+        customerFirstName: form.customerFirstName.trim(),
+        customerLastName: form.customerLastName.trim() || null,
+        itemsSummary: form.itemsSummary.trim(),
+        orderTotal: parseFloat(form.orderTotal),
+        commissionEarned: form.commissionEarned ? parseFloat(form.commissionEarned) : 0,
+        discountCodeId: form.discountCodeId || null,
+        source: form.source,
+        storeName: form.storeName.trim() || null,
+        currency: form.currency,
+        attributed: form.attributed,
+        externalOrderId: form.externalOrderId.trim() || null,
       });
       setEditing(false);
       onUpdated?.(updated);
@@ -76,136 +118,170 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
     }
   }
 
+  const inputClass = "w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500";
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="fixed inset-0 bg-black bg-opacity-40" onClick={onClose} />
       <div className="relative bg-white rounded-t-xl sm:rounded-lg border border-gray-200 w-full sm:max-w-lg sm:mx-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between rounded-t-lg">
-          <h3 className="text-base font-semibold text-gray-900">Order Details</h3>
+          <h3 className="text-base font-semibold text-gray-900">{editing ? 'Edit Order' : 'Order Details'}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
         </div>
 
         {/* Content */}
         <div className="px-4 sm:px-6 py-4 space-y-4">
-          {/* Date */}
-          <Row label="Date & Time" value={date ? formatDateTime(date) : '—'} />
-
-          {/* Customer */}
-          <Row label="Customer" value={isAdmin ? [order.customerFirstName, order.customerLastName].filter(Boolean).join(' ') || '—' : order.customerFirstName || '—'} bold />
-
-          {/* Items - full text, no truncation */}
-          <div>
-            <p className="text-xs text-gray-500 mb-1">Items</p>
-            <div className="bg-gray-50 rounded-lg px-3 py-2">
-              {(order.itemsSummary || '').split(', ').map((item: string, i: number) => (
-                <p key={i} className="text-sm text-gray-800 py-0.5">{item}</p>
-              ))}
-            </div>
-          </div>
-
-          {/* Financials */}
-          <div className="bg-gray-50 rounded-lg px-4 py-3 space-y-2">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Order Total</span>
-              <span className="text-sm text-gray-900 font-semibold">{formatMoney(order.orderTotal)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-500">Commission Earned</span>
-              <span className="text-sm text-green-700 font-semibold">{formatMoney(order.commissionEarned)}</span>
-            </div>
-          </div>
-
-          {/* Code & Affiliate */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Discount Code</p>
-              {code ? (
-                <span className="inline-block font-mono text-sm bg-gray-100 text-gray-800 px-2 py-1 rounded">{code}</span>
-              ) : (
-                <span className="text-sm text-gray-400">None</span>
-              )}
-            </div>
-            {isAdmin && (
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Affiliate</p>
-                <span className="text-sm text-gray-900">{affiliate || '—'}</span>
-              </div>
-            )}
-          </div>
-
-          {codeLabel && (
-            <Row label="Code Label" value={codeLabel} />
-          )}
-
-          {/* Source, Store, Currency & Attribution — editable for super admin */}
           {editing ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 space-y-3">
               <p className="text-xs font-medium text-blue-700">Editing Order</p>
               {error && <p className="text-xs text-red-600">{error}</p>}
+
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Date & Time</label>
-                <input
-                  type="datetime-local"
-                  value={editDate}
-                  onChange={(e) => setEditDate(e.target.value)}
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
-                />
+                <input type="datetime-local" value={form.createdAt} onChange={(e) => updateForm('createdAt', e.target.value)} className={inputClass} />
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">First Name *</label>
+                  <input type="text" value={form.customerFirstName} onChange={(e) => updateForm('customerFirstName', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Last Name</label>
+                  <input type="text" value={form.customerLastName} onChange={(e) => updateForm('customerLastName', e.target.value)} className={inputClass} />
+                </div>
+              </div>
+
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Source</label>
-                <select
-                  value={editSource}
-                  onChange={(e) => setEditSource(e.target.value)}
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
-                >
-                  <option value="shopify">Shopify</option>
-                  <option value="wordpress">WordPress</option>
-                  <option value="stripe">Stripe</option>
+                <label className="text-xs text-gray-500 block mb-1">Items Summary *</label>
+                <input type="text" value={form.itemsSummary} onChange={(e) => updateForm('itemsSummary', e.target.value)} className={inputClass} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Order Total *</label>
+                  <input type="number" step="0.01" value={form.orderTotal} onChange={(e) => updateForm('orderTotal', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Commission</label>
+                  <input type="number" step="0.01" value={form.commissionEarned} onChange={(e) => updateForm('commissionEarned', e.target.value)} className={inputClass} />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Discount Code</label>
+                <select value={form.discountCodeId} onChange={(e) => updateForm('discountCodeId', e.target.value)} className={inputClass}>
+                  <option value="">None</option>
+                  {codes.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.code} — {c.affiliate?.name || 'Unknown'}</option>
+                  ))}
                 </select>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Store Name</label>
-                <input
-                  type="text"
-                  value={editStoreName}
-                  onChange={(e) => setEditStoreName(e.target.value)}
-                  placeholder="Store name"
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
-                />
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Source</label>
+                  <select value={form.source} onChange={(e) => updateForm('source', e.target.value)} className={inputClass}>
+                    <option value="shopify">Shopify</option>
+                    <option value="wordpress">WordPress</option>
+                    <option value="stripe">Stripe</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Store</label>
+                  <input type="text" value={form.storeName} onChange={(e) => updateForm('storeName', e.target.value)}
+                    list="edit-store-names" className={inputClass} />
+                  <datalist id="edit-store-names">
+                    {storeNames.map(s => <option key={s} value={s} />)}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Currency</label>
+                  <select value={form.currency} onChange={(e) => updateForm('currency', e.target.value)} className={inputClass}>
+                    <option value="USD">USD</option>
+                    <option value="CAD">CAD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                  </select>
+                </div>
               </div>
+
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Currency</label>
-                <select
-                  value={editCurrency}
-                  onChange={(e) => setEditCurrency(e.target.value)}
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
-                >
-                  <option value="USD">USD</option>
-                  <option value="CAD">CAD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                </select>
+                <label className="text-xs text-gray-500 block mb-1">External Order ID</label>
+                <input type="text" value={form.externalOrderId} onChange={(e) => updateForm('externalOrderId', e.target.value)}
+                  placeholder="Optional" className={inputClass} />
               </div>
+
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={form.attributed} onChange={(e) => updateForm('attributed', e.target.checked)}
+                  className="rounded border-gray-300" />
+                Attributed
+              </label>
+
               <div className="flex gap-2 pt-1">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50"
-                >
+                <button onClick={handleSave} disabled={saving}
+                  className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50">
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>
-                <button
-                  onClick={() => setEditing(false)}
-                  disabled={saving}
-                  className="text-sm text-gray-600 px-3 py-1.5 rounded hover:bg-gray-100"
-                >
+                <button onClick={() => setEditing(false)} disabled={saving}
+                  className="text-sm text-gray-600 px-3 py-1.5 rounded hover:bg-gray-100">
                   Cancel
                 </button>
               </div>
             </div>
           ) : (
             <>
+              {/* Date */}
+              <Row label="Date & Time" value={date ? formatDateTime(date) : '—'} />
+
+              {/* Customer */}
+              <Row label="Customer" value={isAdmin ? [order.customerFirstName, order.customerLastName].filter(Boolean).join(' ') || '—' : order.customerFirstName || '—'} bold />
+
+              {/* Items - full text, no truncation */}
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Items</p>
+                <div className="bg-gray-50 rounded-lg px-3 py-2">
+                  {(order.itemsSummary || '').split(', ').map((item: string, i: number) => (
+                    <p key={i} className="text-sm text-gray-800 py-0.5">{item}</p>
+                  ))}
+                </div>
+              </div>
+
+              {/* Financials */}
+              <div className="bg-gray-50 rounded-lg px-4 py-3 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-500">Order Total</span>
+                  <span className="text-sm text-gray-900 font-semibold">{formatMoney(order.orderTotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-500">Commission Earned</span>
+                  <span className="text-sm text-green-700 font-semibold">{formatMoney(order.commissionEarned)}</span>
+                </div>
+              </div>
+
+              {/* Code & Affiliate */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Discount Code</p>
+                  {code ? (
+                    <span className="inline-block font-mono text-sm bg-gray-100 text-gray-800 px-2 py-1 rounded">{code}</span>
+                  ) : (
+                    <span className="text-sm text-gray-400">None</span>
+                  )}
+                </div>
+                {isAdmin && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Affiliate</p>
+                    <span className="text-sm text-gray-900">{affiliate || '—'}</span>
+                  </div>
+                )}
+              </div>
+
+              {codeLabel && (
+                <Row label="Code Label" value={codeLabel} />
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Source</p>
@@ -225,24 +301,22 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
 
               <Row label="Currency" value={order.currency || 'USD'} />
 
+              {/* External Order ID */}
+              {order.externalOrderId && (
+                <Row label="External Order ID" value={order.externalOrderId} mono />
+              )}
+
+              {/* Order ID */}
+              <Row label="Internal ID" value={order.id} mono />
+
               {isSuperAdmin && (
-                <button
-                  onClick={startEdit}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Edit Date / Source / Store / Currency
+                <button onClick={startEdit}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                  Edit Order
                 </button>
               )}
             </>
           )}
-
-          {/* External Order ID */}
-          {order.externalOrderId && (
-            <Row label="External Order ID" value={order.externalOrderId} mono />
-          )}
-
-          {/* Order ID */}
-          <Row label="Internal ID" value={order.id} mono />
         </div>
 
         {/* Footer */}
