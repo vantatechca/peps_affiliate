@@ -25,6 +25,12 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
   const [editSource, setEditSource] = useState(order?.source || '');
   const [editCurrency, setEditCurrency] = useState(order?.currency || 'USD');
   const [editStoreName, setEditStoreName] = useState(order?.storeName || '');
+  const [editDate, setEditDate] = useState(() => {
+    const d = order?.createdAt || order?.date;
+    if (!d) return '';
+    const dt = new Date(d);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}T${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const { confirmProps, confirm } = useConfirm();
@@ -40,6 +46,11 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
     setEditSource(order.source || '');
     setEditCurrency(order.currency || 'USD');
     setEditStoreName(order.storeName || '');
+    const d = order.createdAt || order.date;
+    if (d) {
+      const dt = new Date(d);
+      setEditDate(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}T${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`);
+    }
     setError('');
     setEditing(true);
   }
@@ -54,6 +65,7 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
         source: editSource,
         currency: editCurrency,
         storeName: editStoreName,
+        createdAt: editDate ? new Date(editDate).toISOString() : undefined,
       });
       setEditing(false);
       onUpdated?.(updated);
@@ -132,6 +144,15 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
               <p className="text-xs font-medium text-blue-700">Editing Order</p>
               {error && <p className="text-xs text-red-600">{error}</p>}
               <div>
+                <label className="text-xs text-gray-500 block mb-1">Date & Time</label>
+                <input
+                  type="datetime-local"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
                 <label className="text-xs text-gray-500 block mb-1">Source</label>
                 <select
                   value={editSource}
@@ -209,7 +230,7 @@ export default function OrderDetailModal({ order, onClose, isAdmin, isSuperAdmin
                   onClick={startEdit}
                   className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                 >
-                  Edit Source / Store / Currency
+                  Edit Date / Source / Store / Currency
                 </button>
               )}
             </>

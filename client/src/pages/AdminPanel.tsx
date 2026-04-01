@@ -4,6 +4,7 @@ import { api } from '../api';
 import { downloadBusinessOverviewPDF } from '../pdfReport';
 import DataTable, { Column } from '../components/DataTable';
 import OrderDetailModal from '../components/OrderDetailModal';
+import AddOrderModal from '../components/AddOrderModal';
 import ConfirmModal from '../components/ConfirmModal';
 import { useConfirm } from '../hooks/useConfirm';
 import Tutorial, { TutorialStep } from '../components/Tutorial';
@@ -1027,6 +1028,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showAddOrder, setShowAddOrder] = useState(false);
   const searchTimer = useRef<any>(null);
   const storeNameTimer = useRef<any>(null);
 
@@ -1228,6 +1230,12 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
               Delete {selectedIds.size} selected
             </button>
           )}
+          {isSuperAdmin && (
+            <button onClick={() => setShowAddOrder(true)}
+              className="text-sm bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-gray-800">
+              + Add Order
+            </button>
+          )}
           <button onClick={handleDownloadCSV}
             className="text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">
             Download CSV
@@ -1273,6 +1281,12 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
           isSuperAdmin={isSuperAdmin}
           onDelete={(id) => { handleDelete(id); setSelectedOrder(null); }}
           onUpdated={(updated) => { setSelectedOrder(updated); loadOrders(); }}
+        />
+      )}
+      {showAddOrder && (
+        <AddOrderModal
+          onClose={() => setShowAddOrder(false)}
+          onCreated={() => { setShowAddOrder(false); loadOrders(); }}
         />
       )}
       <ConfirmModal {...confirmProps} />
