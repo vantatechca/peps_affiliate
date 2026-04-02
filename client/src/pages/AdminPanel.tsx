@@ -1024,6 +1024,8 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [storeNameFilter, setStoreNameFilter] = useState('');
   const [storeNameDebounced, setStoreNameDebounced] = useState('');
   const [currencyFilter, setCurrencyFilter] = useState('');
+  const [codeFilter, setCodeFilter] = useState('');
+  const [codes, setCodes] = useState<any[]>([]);
   const [storeNames, setStoreNames] = useState<string[]>([]);
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
@@ -1050,7 +1052,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
     }, 400);
   }
 
-  useEffect(() => { api.getStores().then(setStoreNames).catch(() => {}); }, []);
+  useEffect(() => { api.getStores().then(setStoreNames).catch(() => {}); api.getCodes().then(setCodes).catch(() => {}); }, []);
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (storeDropdownRef.current && !storeDropdownRef.current.contains(e.target as Node)) setShowStoreDropdown(false);
@@ -1058,8 +1060,8 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  useEffect(() => { setPage(1); }, [filter, startDate, endDate, sourceFilter, storeNameDebounced, currencyFilter]);
-  useEffect(() => { loadOrders(); }, [page, filter, searchDebounced, startDate, endDate, sourceFilter, storeNameDebounced, currencyFilter]);
+  useEffect(() => { setPage(1); }, [filter, startDate, endDate, sourceFilter, storeNameDebounced, currencyFilter, codeFilter]);
+  useEffect(() => { loadOrders(); }, [page, filter, searchDebounced, startDate, endDate, sourceFilter, storeNameDebounced, currencyFilter, codeFilter]);
 
   function loadOrders() {
     const params: any = { page: page.toString(), limit: '50' };
@@ -1071,6 +1073,7 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
     if (sourceFilter) params.source = sourceFilter;
     if (storeNameDebounced.trim()) params.storeName = storeNameDebounced.trim();
     if (currencyFilter) params.currency = currencyFilter;
+    if (codeFilter) params.discountCodeId = codeFilter;
     api.getOrders(params).then((d) => { setData(d); setSelectedIds(new Set()); });
   }
 
@@ -1219,8 +1222,15 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
             <option value="EUR">EUR</option>
             <option value="GBP">GBP</option>
           </select>
-          {(startDate || endDate || sourceFilter || storeNameFilter || currencyFilter) && (
-            <button onClick={() => { setStartDate(''); setEndDate(''); setSourceFilter(''); setStoreNameFilter(''); setStoreNameDebounced(''); setCurrencyFilter(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear all</button>
+          <select value={codeFilter} onChange={(e) => setCodeFilter(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-2 py-1">
+            <option value="">All Codes</option>
+            {codes.map((c: any) => (
+              <option key={c.id} value={c.id}>{c.code}{c.affiliate?.name ? ` — ${c.affiliate.name}` : ''}</option>
+            ))}
+          </select>
+          {(startDate || endDate || sourceFilter || storeNameFilter || currencyFilter || codeFilter) && (
+            <button onClick={() => { setStartDate(''); setEndDate(''); setSourceFilter(''); setStoreNameFilter(''); setStoreNameDebounced(''); setCurrencyFilter(''); setCodeFilter(''); }} className="text-xs text-gray-500 hover:text-gray-900">Clear all</button>
           )}
         </div>
         <div className="flex items-center gap-2">

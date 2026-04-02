@@ -265,7 +265,7 @@ router.post('/codes/batch-delete', async (req: Request, res: Response) => {
 // GET /api/admin/orders
 router.get('/orders', async (req: Request, res: Response) => {
   try {
-    const { page = '1', limit = '50', affiliateId, attributed, search, startDate, endDate, source, currency, storeName } = req.query;
+    const { page = '1', limit = '50', affiliateId, attributed, search, startDate, endDate, source, currency, storeName, discountCodeId } = req.query;
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
     const where: any = {};
@@ -283,6 +283,9 @@ router.get('/orders', async (req: Request, res: Response) => {
     }
     if (storeName) {
       where.storeName = { contains: storeName as string, mode: 'insensitive' };
+    }
+    if (discountCodeId) {
+      where.discountCodeId = discountCodeId as string;
     }
     if (startDate || endDate) {
       where.createdAt = {};
