@@ -150,6 +150,9 @@ router.get('/codes', async (_req: Request, res: Response) => {
     const codes = await prisma.discountCode.findMany({
       include: {
         affiliate: { select: { id: true, name: true, email: true } },
+        splits: {
+          include: { recipientUser: { select: { id: true, name: true, email: true } } },
+        },
         _count: { select: { orders: { where: { attributed: true } } } },
       },
       orderBy: { createdAt: 'desc' },
@@ -157,6 +160,106 @@ router.get('/codes', async (_req: Request, res: Response) => {
     res.json(codes);
   } catch (error) {
     console.error('Get codes error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============ COMMISSION SPLITS (per discount code) ============
+
+// GET /api/admin/codes/:id/splits
+router.get('/codes/:id/splits', async (req: Request, res: Response) => {
+  try {
+    const splits = await prisma.commissionSplit.findMany({
+      where: { discountCodeId: req.params.id },
+      include: { recipientUser: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json(splits);
+  } catch (error) {
+    console.error('Get splits error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/admin/codes/:id/splits — replace the full split list atomically.
+// Body: { splits: [{ recipientUserId, sharePercent, note? }, ...] }
+// sharePercent values must sum to 1.0 (±0.0001). Empty array clears splits
+// and restores legacy behavior (100% to the code's affiliate).
+router.put('/codes/:id/splits', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { splits } = req.body as {
+      splits: Array<{ recipientUserId: string; sharePercent: number; note?: string | null }>;
+    };
+
+    if (!Array.isArray(splits)) {
+      return res.status(400).json({ error: 'splits must be an array' });
+    }
+
+    const code = await prisma.discountCode.findUnique({ where: { id } });
+    if (!code) return res.status(404).json({ error: 'Code not found' });
+
+    if (splits.length > 0) {
+      // Validate share percentages (expected 0 < s <= 1 and sum ~= 1.0)
+      for (const s of splits) {
+        if (!s.recipientUserId) return res.status(400).json({ error: 'recipientUserId required on every split' });
+        if (typeof s.sharePercent !== 'number' || s.sharePercent <= 0 || s.sharePercent > 1) {
+          return res.status(400).json({ error: 'sharePercent must be between 0 (exclusive) and 1 (inclusive)' });
+        }
+      }
+      const sum = splits.reduce((acc, s) => acc + s.sharePercent, 0);
+      if (Math.abs(sum - 1) > 0.0001) {
+        return res.status(400).json({ error: `Share percentages must sum to 100% (got ${(sum * 100).toFixed(2)}%)` });
+      }
+
+      // Ensure every recipient is a real user
+      const userIds = [...new Set(splits.map((s) => s.recipientUserId))];
+      const foundUsers = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true } });
+      if (foundUsers.length !== userIds.length) {
+        return res.status(400).json({ error: 'One or more recipientUserId values do not exist' });
+      }
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.commissionSplit.deleteMany({ where: { discountCodeId: id } });
+      if (splits.length > 0) {
+        await tx.commissionSplit.createMany({
+          data: splits.map((s) => ({
+            discountCodeId: id,
+            recipientUserId: s.recipientUserId,
+            sharePercent: s.sharePercent,
+            note: s.note || null,
+          })),
+        });
+      }
+      return tx.commissionSplit.findMany({
+        where: { discountCodeId: id },
+        include: { recipientUser: { select: { id: true, name: true, email: true } } },
+        orderBy: { createdAt: 'asc' },
+      });
+    });
+
+    logAudit({
+      ...auditFromReq(req),
+      action: 'UPDATE_CODE_SPLITS',
+      entity: 'DiscountCode',
+      entityId: id,
+      details: {
+        code: code.code,
+        splitCount: splits.length,
+        splits: splits.map((s) => ({ recipientUserId: s.recipientUserId, sharePercent: s.sharePercent })),
+      },
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Update splits error:', error);
+    logSystem({
+      level: 'ERROR',
+      source: 'API',
+      message: 'Update splits error',
+      details: { error: String(error), codeId: req.params.id },
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
