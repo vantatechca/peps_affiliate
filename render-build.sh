@@ -15,4 +15,8 @@ npm install --include=dev
 chmod -R +x node_modules/.bin
 npx prisma generate
 npx prisma db push
+# Commission-splits feature: idempotent backfill of OrderCommission ledger.
+# Safe to run on every deploy — it only touches attributed orders that have
+# no ledger row yet (empty on second run and beyond).
+npx tsx src/backfill-commissions.ts
 npx tsc
