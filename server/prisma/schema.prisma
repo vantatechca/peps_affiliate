@@ -20,56 +20,95 @@ enum PayoutStatus {
 }
 
 model User {
-  id                    String         @id @default(uuid())
-  email                 String         @unique
+  id                    String             @id @default(uuid())
+  email                 String             @unique
   passwordHash          String
   passwordPlain         String?
   name                  String
-  role                  Role           @default(AFFILIATE)
-  defaultCommissionRate Float          @default(0.20)
-  active                Boolean        @default(true)
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  role                  Role               @default(AFFILIATE)
+  defaultCommissionRate Float              @default(0.20)
+  active                Boolean            @default(true)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
   discountCodes         DiscountCode[]
   payouts               Payout[]
+  commissionSplits      CommissionSplit[]  @relation("SplitRecipient")
+  orderCommissions      OrderCommission[]  @relation("OrderCommissionRecipient")
 }
 
 model DiscountCode {
-  id                     String    @id @default(uuid())
-  code                   String    @unique
+  id                     String            @id @default(uuid())
+  code                   String            @unique
   affiliateId            String
-  affiliate              User      @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  discountPercent        Float     @default(0.10)
+  affiliate              User              @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  discountPercent        Float             @default(0.10)
   commissionRateOverride Float?
   label                  String?
-  active                 Boolean   @default(true)
+  active                 Boolean           @default(true)
   expiresAt              DateTime?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
   orders                 Order[]
+  splits                 CommissionSplit[]
 
   @@index([affiliateId])
   @@index([code])
 }
 
 model Order {
-  id                String        @id @default(uuid())
+  id                String            @id @default(uuid())
   externalOrderId   String?
   discountCodeId    String?
-  discountCode      DiscountCode? @relation(fields: [discountCodeId], references: [id])
+  discountCode      DiscountCode?     @relation(fields: [discountCodeId], references: [id])
   customerFirstName String
   customerLastName  String?
   itemsSummary      String
   orderTotal        Float
-  commissionEarned  Float         @default(0)
-  attributed        Boolean       @default(false)
-  source            String        @default("shopify")
+  commissionEarned  Float             @default(0)
+  attributed        Boolean           @default(false)
+  source            String            @default("shopify")
   storeName         String?
-  currency          String        @default("USD")
-  createdAt         DateTime      @default(now())
+  currency          String            @default("USD")
+  createdAt         DateTime          @default(now())
+  commissions       OrderCommission[]
 
   @@index([discountCodeId])
   @@index([createdAt])
+}
+
+// Per-discount-code rule for splitting commission among recipients.
+// If a code has no splits, 100% of the commission goes to the code's affiliate.
+// sharePercent values must sum to 1.0 across all splits for a given code.
+model CommissionSplit {
+  id              String       @id @default(uuid())
+  discountCodeId  String
+  discountCode    DiscountCode @relation(fields: [discountCodeId], references: [id], onDelete: Cascade)
+  recipientUserId String
+  recipientUser   User         @relation("SplitRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  sharePercent    Float
+  note            String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([discountCodeId])
+  @@index([recipientUserId])
+}
+
+// Per-order ledger of what each recipient actually earned. Written at webhook
+// time and is the source of truth for affiliate earnings and payout math.
+// Sums up to Order.commissionEarned (the order's total commission pool).
+model OrderCommission {
+  id              String   @id @default(uuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  recipientUserId String
+  recipientUser   User     @relation("OrderCommissionRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  amount          Float
+  sharePercent    Float    @default(1.0)
+  createdAt       DateTime @default(now())
+
+  @@index([orderId])
+  @@index([recipientUserId])
 }
 
 model Payout {

@@ -79,7 +79,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
       // Try exact match first
       discountCodeRecord = await prisma.discountCode.findUnique({
         where: { code: codeToFind },
-        include: { affiliate: true },
+        include: { affiliate: true, splits: true },
       });
 
       // If no exact match, try partial match (code might have extra text)
@@ -92,7 +92,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
               mode: 'insensitive',
             },
           },
-          include: { affiliate: true },
+          include: { affiliate: true, splits: true },
         });
       }
 
@@ -100,7 +100,7 @@ router.post('/order-paid', async (req: Request, res: Response) => {
       if (!discountCodeRecord) {
         console.log('🔍 Partial match failed, checking if code contains any known codes...');
         const allCodes = await prisma.discountCode.findMany({
-          include: { affiliate: true },
+          include: { affiliate: true, splits: true },
         });
         for (const c of allCodes) {
           if (codeToFind.includes(c.code.toUpperCase())) {
@@ -144,7 +144,34 @@ router.post('/order-paid', async (req: Request, res: Response) => {
       console.log('ℹ️ No discount code provided in webhook');
     }
 
-    // Create order record
+    // Build per-recipient commission rows (the ledger).
+    // - No splits configured on the code → 100% goes to the code's affiliate (legacy behavior).
+    // - Splits configured → distribute total commission by each split's sharePercent.
+    // Rounding drift is absorbed by the last row so the sum matches `commissionEarned` exactly.
+    type CommissionAllocation = { recipientUserId: string; amount: number; sharePercent: number };
+    const allocations: CommissionAllocation[] = [];
+    if (attributed && discountCodeRecord && commissionEarned > 0) {
+      const splits = (discountCodeRecord as any).splits as Array<{ recipientUserId: string; sharePercent: number }> | undefined;
+      if (splits && splits.length > 0) {
+        let remaining = commissionEarned;
+        splits.forEach((s, i) => {
+          const isLast = i === splits.length - 1;
+          const amount = isLast
+            ? parseFloat(remaining.toFixed(2))
+            : parseFloat((commissionEarned * s.sharePercent).toFixed(2));
+          remaining = parseFloat((remaining - amount).toFixed(2));
+          allocations.push({ recipientUserId: s.recipientUserId, amount, sharePercent: s.sharePercent });
+        });
+      } else {
+        allocations.push({
+          recipientUserId: discountCodeRecord.affiliateId,
+          amount: commissionEarned,
+          sharePercent: 1.0,
+        });
+      }
+    }
+
+    // Create order record + per-recipient commission rows in one transaction
     const order = await prisma.order.create({
       data: {
         externalOrderId: external_order_id || null,
@@ -158,8 +185,23 @@ router.post('/order-paid', async (req: Request, res: Response) => {
         source,
         storeName: source_store || store_name || null,
         currency: currency.toUpperCase(),
+        commissions: {
+          create: allocations.map((a) => ({
+            recipientUserId: a.recipientUserId,
+            amount: a.amount,
+            sharePercent: a.sharePercent,
+          })),
+        },
       },
     });
+
+    if (allocations.length > 1) {
+      console.log(
+        `🪓 Commission split across ${allocations.length} recipients: ${allocations
+          .map((a) => `${a.recipientUserId.slice(0, 8)}=$${a.amount}`)
+          .join(', ')}`
+      );
+    }
 
     console.log(
       `✅ Order saved: ${order.id} | Code: ${discount_code || 'none'} | Attributed: ${attributed} | Commission: $${commissionEarned}`

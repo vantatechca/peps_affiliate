@@ -20,43 +20,57 @@ router.get('/dashboard', async (req: Request, res: Response) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    const codeIds = codes.map((c) => c.id);
-
-    // Total stats
-    const totalStats = await prisma.order.aggregate({
-      where: { discountCodeId: { in: codeIds }, attributed: true },
-      _sum: { orderTotal: true, commissionEarned: true },
-      _count: true,
-    });
-
-    // This month stats
+    // Period boundaries
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const monthlyStats = await prisma.order.aggregate({
-      where: {
-        discountCodeId: { in: codeIds },
-        attributed: true,
-        createdAt: { gte: startOfMonth },
-      },
-      _sum: { orderTotal: true, commissionEarned: true },
-      _count: true,
-    });
-
-    // Today stats
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    const dailyStats = await prisma.order.aggregate({
-      where: {
-        discountCodeId: { in: codeIds },
-        attributed: true,
-        createdAt: { gte: startOfDay },
-      },
-      _sum: { orderTotal: true, commissionEarned: true },
-      _count: true,
-    });
+    // Earnings are the sum of this affiliate's OrderCommission ledger rows
+    // (accounts for commission splits). Revenue and order counts still come
+    // from Order rows where this affiliate is credited (via OrderCommission).
+    const [totalEarnings, monthlyEarnings, dailyEarnings] = await Promise.all([
+      prisma.orderCommission.aggregate({
+        where: { recipientUserId: userId },
+        _sum: { amount: true },
+      }),
+      prisma.orderCommission.aggregate({
+        where: { recipientUserId: userId, createdAt: { gte: startOfMonth } },
+        _sum: { amount: true },
+      }),
+      prisma.orderCommission.aggregate({
+        where: { recipientUserId: userId, createdAt: { gte: startOfDay } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    // Order counts + revenue: count distinct orders where this affiliate got
+    // any commission credit. Revenue is the order total on those orders.
+    const [totalOrders, monthlyOrders, dailyOrders] = await Promise.all([
+      prisma.order.findMany({
+        where: { commissions: { some: { recipientUserId: userId } } },
+        select: { orderTotal: true },
+      }),
+      prisma.order.findMany({
+        where: {
+          commissions: { some: { recipientUserId: userId } },
+          createdAt: { gte: startOfMonth },
+        },
+        select: { orderTotal: true },
+      }),
+      prisma.order.findMany({
+        where: {
+          commissions: { some: { recipientUserId: userId } },
+          createdAt: { gte: startOfDay },
+        },
+        select: { orderTotal: true },
+      }),
+    ]);
+
+    const sumRevenue = (rows: { orderTotal: number }[]) =>
+      rows.reduce((acc, r) => acc + r.orderTotal, 0);
 
     // Pending payouts
     const pendingPayouts = await prisma.payout.aggregate({
@@ -81,19 +95,19 @@ router.get('/dashboard', async (req: Request, res: Response) => {
       })),
       stats: {
         total: {
-          orders: totalStats._count,
-          revenue: totalStats._sum.orderTotal || 0,
-          earnings: totalStats._sum.commissionEarned || 0,
+          orders: totalOrders.length,
+          revenue: sumRevenue(totalOrders),
+          earnings: totalEarnings._sum.amount || 0,
         },
         monthly: {
-          orders: monthlyStats._count,
-          revenue: monthlyStats._sum.orderTotal || 0,
-          earnings: monthlyStats._sum.commissionEarned || 0,
+          orders: monthlyOrders.length,
+          revenue: sumRevenue(monthlyOrders),
+          earnings: monthlyEarnings._sum.amount || 0,
         },
         daily: {
-          orders: dailyStats._count,
-          revenue: dailyStats._sum.orderTotal || 0,
-          earnings: dailyStats._sum.commissionEarned || 0,
+          orders: dailyOrders.length,
+          revenue: sumRevenue(dailyOrders),
+          earnings: dailyEarnings._sum.amount || 0,
         },
       },
       payouts: {
@@ -114,15 +128,11 @@ router.get('/orders', async (req: Request, res: Response) => {
     const { page = '1', limit = '50', period, startDate, endDate } = req.query;
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const codes = await prisma.discountCode.findMany({
-      where: { affiliateId: userId },
-      select: { id: true },
-    });
-    const codeIds = codes.map((c) => c.id);
-
+    // Show every order where this user received any commission credit, not
+    // just orders using codes they own (splits mean they can earn from others'
+    // codes too).
     const where: any = {
-      discountCodeId: { in: codeIds },
-      attributed: true,
+      commissions: { some: { recipientUserId: userId } },
     };
 
     // Filter by custom date range (takes priority over period)
@@ -157,6 +167,7 @@ router.get('/orders', async (req: Request, res: Response) => {
         where,
         include: {
           discountCode: { select: { code: true, label: true } },
+          commissions: { where: { recipientUserId: userId }, select: { amount: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -165,13 +176,14 @@ router.get('/orders', async (req: Request, res: Response) => {
       prisma.order.count({ where }),
     ]);
 
-    // Map to only show what affiliate should see
+    // `commissionEarned` here = this affiliate's share of that order (not the
+    // total pool). That way the dashboard numbers match what they actually got.
     const safeOrders = orders.map((o) => ({
       id: o.id,
       customerFirstName: o.customerFirstName,
       itemsSummary: o.itemsSummary,
       orderTotal: o.orderTotal,
-      commissionEarned: o.commissionEarned,
+      commissionEarned: o.commissions.reduce((acc, c) => acc + c.amount, 0),
       discountCode: o.discountCode?.code,
       codeLabel: o.discountCode?.label,
       source: o.source,

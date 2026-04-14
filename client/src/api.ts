@@ -67,6 +67,13 @@ export const api = {
   batchDeleteCodes: (ids: string[]) =>
     request('/admin/codes/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
 
+  // Commission splits (per-code)
+  getCodeSplits: (codeId: string) => request(`/admin/codes/${codeId}/splits`),
+  updateCodeSplits: (
+    codeId: string,
+    splits: Array<{ recipientUserId: string; sharePercent: number; note?: string | null }>
+  ) => request(`/admin/codes/${codeId}/splits`, { method: 'PUT', body: JSON.stringify({ splits }) }),
+
   getOrders: (params?: any) => {
     const qs = new URLSearchParams(params || {}).toString();
     return request(`/admin/orders?${qs}`);

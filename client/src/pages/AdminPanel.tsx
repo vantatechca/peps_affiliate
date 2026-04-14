@@ -820,6 +820,7 @@ function CodesTab() {
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ code: '', affiliateId: '', discountPercent: '10', commissionRateOverride: '', label: '', expiresAt: '' });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [splitsForCode, setSplitsForCode] = useState<any | null>(null);
   const { confirmProps, confirm } = useConfirm();
 
   useEffect(() => { loadCodes(); api.getAffiliates().then(setAffiliates); }, []);
@@ -896,15 +897,28 @@ function CodesTab() {
     { key: 'affiliate.name', label: 'Affiliate', defaultWidth: 150, className: 'text-gray-600' },
     { key: 'discountPercent', label: 'Discount', defaultWidth: 100, render: (r: any) => formatPct(r.discountPercent), className: 'text-gray-600' },
     { key: 'commissionRateOverride', label: 'Commission', defaultWidth: 110, render: (r: any) => r.commissionRateOverride ? formatPct(r.commissionRateOverride) : '—', className: 'text-gray-600' },
+    {
+      key: '_splits', label: 'Split', defaultWidth: 120, sortable: false,
+      render: (r: any) => {
+        const count = r.splits?.length || 0;
+        if (count === 0) return <span className="text-gray-400 text-xs">—</span>;
+        return (
+          <span className="text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+            {count}-way
+          </span>
+        );
+      },
+    },
     { key: 'label', label: 'Label', defaultWidth: 130, className: 'text-gray-500' },
     { key: '_used', label: 'Used', defaultWidth: 80, render: (r: any) => <span className="text-gray-900 font-medium">{r._count?.orders || 0}×</span> },
     { key: 'expiresAt', label: 'Expires', defaultWidth: 130, render: (r: any) => r.expiresAt ? formatDate(r.expiresAt) : 'Never', className: 'text-gray-500' },
     { key: 'active', label: 'Status', defaultWidth: 90, render: (r: any) => { const s = getCodeStatus(r); return <span className={`text-xs font-medium ${s.color}`}>{s.label}</span>; } },
     {
-      key: '_actions', label: 'Actions', defaultWidth: 180, sortable: false,
+      key: '_actions', label: 'Actions', defaultWidth: 220, sortable: false,
       render: (r: any) => (
         <div className="flex gap-2">
           <button onClick={() => openEdit(r)} className="text-xs text-blue-600 hover:underline">Edit</button>
+          <button onClick={() => setSplitsForCode(r)} className="text-xs text-indigo-600 hover:underline">Splits</button>
           <button onClick={() => toggleActive(r)} className="text-xs text-gray-500 hover:underline">{r.active ? 'Deactivate' : 'Activate'}</button>
           <button onClick={() => handleDelete(r)} className="text-xs text-red-500 hover:underline">Delete</button>
         </div>
@@ -974,7 +988,7 @@ function CodesTab() {
                   <input type="checkbox" checked={selectedIds.size === codes.length && codes.length > 0}
                     onChange={toggleSelectAll} className="rounded border-gray-300" />
                 </td>
-                <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={5}>Total ({codes.length} codes)</td>
+                <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={6}>Total ({codes.length} codes)</td>
                 <td className="px-4 py-3 text-gray-900 font-semibold text-sm">{codes.reduce((s, c) => s + (c._count?.orders || 0), 0)}×</td>
                 <td className="px-4 py-3" colSpan={3}></td>
               </tr>
@@ -983,6 +997,229 @@ function CodesTab() {
         />
       </div>
       <ConfirmModal {...confirmProps} />
+
+      {splitsForCode && (
+        <SplitsModal
+          code={splitsForCode}
+          affiliates={affiliates}
+          onClose={() => setSplitsForCode(null)}
+          onSaved={() => { setSplitsForCode(null); loadCodes(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============ SPLITS MODAL ============
+// Admin-only editor for CommissionSplit rows on a single discount code.
+// Shares must sum to 100%. Empty list = 100% to the code's affiliate (legacy).
+
+type SplitDraft = { recipientUserId: string; sharePercent: string; note: string };
+
+function SplitsModal({
+  code, affiliates, onClose, onSaved,
+}: {
+  code: any;
+  affiliates: any[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [rows, setRows] = useState<SplitDraft[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const existing = await api.getCodeSplits(code.id);
+        if (existing.length > 0) {
+          setRows(existing.map((s: any) => ({
+            recipientUserId: s.recipientUserId,
+            sharePercent: (s.sharePercent * 100).toString(),
+            note: s.note || '',
+          })));
+        } else {
+          // Sensible default: affiliate gets 100%. Admin can adjust rows from here.
+          setRows([{ recipientUserId: code.affiliateId, sharePercent: '100', note: '' }]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code.id]);
+
+  const total = rows.reduce((acc, r) => acc + (parseFloat(r.sharePercent) || 0), 0);
+  const totalOk = Math.abs(total - 100) < 0.01;
+
+  function update(i: number, patch: Partial<SplitDraft>) {
+    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+  function add() {
+    setRows((prev) => [...prev, { recipientUserId: '', sharePercent: '', note: '' }]);
+  }
+  function remove(i: number) {
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  async function save() {
+    setError(null);
+
+    // Empty list = remove splits (legacy behavior: 100% to code's affiliate).
+    if (rows.length === 0) {
+      setSaving(true);
+      try {
+        await api.updateCodeSplits(code.id, []);
+        onSaved();
+      } catch (err: any) {
+        setError(err.message || 'Failed to save');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    if (!totalOk) {
+      setError(`Share percentages must sum to 100% (currently ${total.toFixed(2)}%)`);
+      return;
+    }
+    for (const r of rows) {
+      if (!r.recipientUserId) {
+        setError('Every row must have a recipient');
+        return;
+      }
+      const pct = parseFloat(r.sharePercent);
+      if (!(pct > 0)) {
+        setError('Every share must be greater than 0');
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      await api.updateCodeSplits(
+        code.id,
+        rows.map((r) => ({
+          recipientUserId: r.recipientUserId,
+          sharePercent: parseFloat(r.sharePercent) / 100,
+          note: r.note || null,
+        }))
+      );
+      onSaved();
+    } catch (err: any) {
+      setError(err.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="fixed inset-0 bg-black bg-opacity-40" onClick={onClose} />
+      <div className="relative bg-white rounded-t-xl sm:rounded-lg border border-gray-200 w-full sm:max-w-2xl sm:mx-4 p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-base font-semibold text-gray-900">
+            Commission Splits — <span className="font-mono">{code.code}</span>
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+        </div>
+        <p className="text-xs text-gray-500 mb-4">
+          Divide the total commission earned on this code among multiple affiliates. Leave the
+          list empty to credit 100% to the code's owner ({code.affiliate?.name || 'owner'}).
+        </p>
+
+        {loading ? (
+          <div className="text-sm text-gray-500 py-8 text-center">Loading…</div>
+        ) : (
+          <>
+            <div className="space-y-2">
+              {rows.map((r, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2 items-start">
+                  <div className="col-span-6">
+                    <select
+                      value={r.recipientUserId}
+                      onChange={(e) => update(i, { recipientUserId: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-2 py-2 text-sm"
+                    >
+                      <option value="">Select recipient…</option>
+                      {affiliates.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} ({a.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      type="number"
+                      value={r.sharePercent}
+                      onChange={(e) => update(i, { sharePercent: e.target.value })}
+                      placeholder="%"
+                      step="any"
+                      className="w-full border border-gray-300 rounded px-2 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <input
+                      type="text"
+                      value={r.note}
+                      onChange={(e) => update(i, { note: e.target.value })}
+                      placeholder="Note (optional)"
+                      className="w-full border border-gray-300 rounded px-2 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => remove(i)}
+                      className="text-red-500 hover:text-red-700 text-sm px-2 py-2"
+                      title="Remove"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={add}
+                className="text-sm text-indigo-600 hover:underline"
+              >
+                + Add recipient
+              </button>
+              <div className={`text-sm font-medium ${totalOk ? 'text-green-700' : 'text-red-600'}`}>
+                Total: {total.toFixed(2)}% {totalOk ? '✓' : '(must be 100%)'}
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-4 mt-4 border-t border-gray-200">
+              <button
+                onClick={save}
+                disabled={saving}
+                className="flex-1 bg-gray-900 text-white text-sm px-4 py-2.5 rounded hover:bg-gray-800 font-medium disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save Splits'}
+              </button>
+              <button
+                onClick={onClose}
+                className="flex-1 text-sm text-gray-600 px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
