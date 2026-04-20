@@ -463,12 +463,15 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 
 // ============ AFFILIATES ============
 
+const EMAIL_DOMAIN = '@affiliate.com';
+
 function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onViewAs?: (id: string) => void }) {
   const [subTab, setSubTab] = useState<'performance' | 'manage'>('performance');
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ name: '', email: '', password: '', defaultCommissionRate: '20' });
+  const [form, setForm] = useState({ name: '', emailLocal: '', password: '', defaultCommissionRate: '20', code: '' });
+  const [touched, setTouched] = useState({ emailLocal: false, password: false, code: false });
   const [selectedAffiliate, setSelectedAffiliate] = useState<string>('');
   const [perfStats, setPerfStats] = useState<any>(null);
   const { confirmProps, confirm } = useConfirm();
@@ -489,25 +492,51 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
 
   function openCreate() {
     setEditing(null);
-    setForm({ name: '', email: '', password: '', defaultCommissionRate: '20' });
+    setForm({ name: '', emailLocal: '', password: '', defaultCommissionRate: '20', code: '' });
+    setTouched({ emailLocal: false, password: false, code: false });
     setShowModal(true);
   }
 
   function openEdit(aff: any) {
     setEditing(aff);
-    setForm({ name: aff.name, email: aff.email, password: '', defaultCommissionRate: (aff.defaultCommissionRate * 100).toString() });
+    const existing = (aff.email || '').toLowerCase();
+    const emailLocal = existing.endsWith(EMAIL_DOMAIN) ? existing.slice(0, -EMAIL_DOMAIN.length) : existing;
+    setForm({ name: aff.name, emailLocal, password: '', defaultCommissionRate: (aff.defaultCommissionRate * 100).toString(), code: '' });
+    setTouched({ emailLocal: true, password: true, code: true });
     setShowModal(true);
+  }
+
+  function updateName(v: string) {
+    const firstName = v.trim().split(/\s+/)[0] || '';
+    const lower = firstName.toLowerCase();
+    const upper = firstName.toUpperCase();
+    setForm(prev => ({
+      ...prev,
+      name: v,
+      emailLocal: touched.emailLocal ? prev.emailLocal : lower,
+      password: touched.password ? prev.password : (lower ? `${lower}_peps` : ''),
+      code: touched.code ? prev.code : (upper ? `${upper}10` : ''),
+    }));
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const payload: any = { name: form.name, email: form.email, defaultCommissionRate: parseFloat(form.defaultCommissionRate) / 100 };
+    const email = `${form.emailLocal.trim().toLowerCase()}${EMAIL_DOMAIN}`;
+    const payload: any = { name: form.name, email, defaultCommissionRate: parseFloat(form.defaultCommissionRate) / 100 };
     if (editing) {
       if (form.password) payload.password = form.password;
       await api.updateAffiliate(editing.id, payload);
     } else {
       payload.password = form.password;
-      await api.createAffiliate(payload);
+      const newAff = await api.createAffiliate(payload);
+      const code = form.code.trim();
+      if (code && newAff?.id) {
+        try {
+          await api.createCode({ code, affiliateId: newAff.id, discountPercent: 0.10 });
+        } catch (err: any) {
+          alert(`Affiliate created, but code "${code}" could not be created: ${err?.message || err}`);
+        }
+      }
     }
     setShowModal(false);
     loadAffiliates();
@@ -767,10 +796,38 @@ function AffiliatesTab({ isSuperAdmin, onViewAs }: { isSuperAdmin?: boolean; onV
                   <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-3">
-                  <Input label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-                  <Input label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
-                  <Input label={editing ? 'New Password (leave blank to keep)' : 'Password'} value={form.password} onChange={(v) => setForm({ ...form, password: v })} required={!editing} />
+                  <Input label="Name" value={form.name} onChange={updateName} required />
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                    <div className="flex">
+                      <input
+                        type="text"
+                        value={form.emailLocal}
+                        onChange={(e) => { setForm({ ...form, emailLocal: e.target.value }); setTouched({ ...touched, emailLocal: true }); }}
+                        className="flex-1 min-w-0 border border-gray-300 rounded-l px-3 py-2 text-sm focus:outline-none focus:border-gray-900"
+                        required
+                        placeholder="firstname"
+                      />
+                      <span className="inline-flex items-center px-3 py-2 text-sm text-gray-600 bg-gray-100 border border-l-0 border-gray-300 rounded-r whitespace-nowrap select-none">
+                        {EMAIL_DOMAIN}
+                      </span>
+                    </div>
+                  </div>
+                  <Input
+                    label={editing ? 'New Password (leave blank to keep)' : 'Password'}
+                    value={form.password}
+                    onChange={(v) => { setForm({ ...form, password: v }); setTouched({ ...touched, password: true }); }}
+                    required={!editing}
+                  />
                   <Input label="Commission %" type="number" value={form.defaultCommissionRate} onChange={(v) => setForm({ ...form, defaultCommissionRate: v })} />
+                  {!editing && (
+                    <Input
+                      label="Code (optional)"
+                      value={form.code}
+                      onChange={(v) => { setForm({ ...form, code: v }); setTouched({ ...touched, code: true }); }}
+                      placeholder="e.g. ANGELINA10"
+                    />
+                  )}
                   <div className="flex gap-2 pt-2">
                     <button type="submit" className="flex-1 bg-gray-900 text-white text-sm px-4 py-2.5 rounded hover:bg-gray-800 font-medium">{editing ? 'Update' : 'Create'}</button>
                     <button type="button" onClick={() => setShowModal(false)} className="flex-1 text-sm text-gray-600 px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50">Cancel</button>
