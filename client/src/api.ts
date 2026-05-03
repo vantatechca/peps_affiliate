@@ -84,10 +84,16 @@ export const api = {
     request('/admin/orders/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
 
   getPayouts: () => request('/admin/payouts'),
-  createPayout: (data: any) =>
+  previewPayout: (params: { affiliateId: string; startDate: string; endDate: string }) => {
+    const qs = new URLSearchParams(params as any).toString();
+    return request(`/admin/payouts/preview?${qs}`);
+  },
+  createPayout: (data: { affiliateId: string; startDate: string; endDate: string; notes?: string | null; markPaid?: boolean }) =>
     request('/admin/payouts', { method: 'POST', body: JSON.stringify(data) }),
   updatePayout: (id: string, data: any) =>
     request(`/admin/payouts/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deletePayout: (id: string) =>
+    request(`/admin/payouts/${id}`, { method: 'DELETE' }),
 
   // Charts
   affiliateWeekly: () => request('/charts/affiliate/weekly'),

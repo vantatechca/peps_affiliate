@@ -1600,35 +1600,94 @@ function OrdersTab({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
 
 // ============ PAYOUTS ============
 
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function startOfMonthISO() {
+  const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10);
+}
+
 function PayoutsTab() {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ affiliateId: '', amount: '', period: '', notes: '' });
+  const [form, setForm] = useState({
+    affiliateId: '', startDate: startOfMonthISO(), endDate: todayISO(), notes: '', markPaid: false,
+  });
+  const [preview, setPreview] = useState<{ unpaidAmount: number; commissionCount: number } | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const { confirmProps, confirm } = useConfirm();
 
   useEffect(() => { loadPayouts(); api.getAffiliates().then(setAffiliates); }, []);
   async function loadPayouts() { setPayouts(await api.getPayouts()); }
 
+  // Refresh the preview whenever the form's affiliate or range changes.
+  useEffect(() => {
+    if (!showForm || !form.affiliateId || !form.startDate || !form.endDate) {
+      setPreview(null); setPreviewError(null);
+      return;
+    }
+    let cancelled = false;
+    setPreviewError(null);
+    api.previewPayout({ affiliateId: form.affiliateId, startDate: form.startDate, endDate: form.endDate })
+      .then((p: any) => { if (!cancelled) setPreview(p); })
+      .catch((err: any) => { if (!cancelled) { setPreview(null); setPreviewError(err?.message || 'Preview failed'); } });
+    return () => { cancelled = true; };
+  }, [showForm, form.affiliateId, form.startDate, form.endDate]);
+
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
-    await api.createPayout({ affiliateId: form.affiliateId, amount: parseFloat(form.amount), period: form.period, notes: form.notes || null });
-    setShowForm(false); setForm({ affiliateId: '', amount: '', period: '', notes: '' }); loadPayouts();
+    if (!preview || preview.commissionCount === 0) return;
+    setSubmitting(true);
+    try {
+      await api.createPayout({
+        affiliateId: form.affiliateId,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        notes: form.notes || null,
+        markPaid: form.markPaid,
+      });
+      setShowForm(false);
+      setForm({ affiliateId: '', startDate: startOfMonthISO(), endDate: todayISO(), notes: '', markPaid: false });
+      setPreview(null);
+      loadPayouts();
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function markPaid(id: string) { await api.updatePayout(id, { status: 'PAID' }); loadPayouts(); }
+  async function handleDelete(p: any) {
+    const ok = await confirm({
+      title: 'Delete payout?',
+      message: `This releases ${formatMoney(p.amount)} of commissions back to ${p.affiliate?.name || 'the affiliate'}'s available balance.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    await api.deletePayout(p.id);
+    loadPayouts();
+  }
 
   const columns: Column[] = [
     { key: 'affiliate.name', label: 'Affiliate', defaultWidth: 160, className: 'text-gray-900' },
-    { key: 'period', label: 'Period', defaultWidth: 140, className: 'text-gray-600' },
+    { key: 'period', label: 'Period', defaultWidth: 180, className: 'text-gray-600' },
     { key: 'amount', label: 'Amount', align: 'right', defaultWidth: 120, render: (r: any) => <span className="font-medium">{formatMoney(r.amount)}</span>, className: 'text-gray-900' },
+    { key: '_count.commissions', label: 'Commissions', align: 'right', defaultWidth: 110, render: (r: any) => r._count?.commissions ?? 0, className: 'text-gray-500' },
     { key: 'notes', label: 'Notes', defaultWidth: 150, render: (r: any) => r.notes || '—', className: 'text-gray-500' },
     { key: 'status', label: 'Status', defaultWidth: 100, render: (r: any) => <span className={`text-xs font-medium ${r.status === 'PAID' ? 'text-green-700' : r.status === 'PROCESSING' ? 'text-yellow-600' : 'text-gray-500'}`}>{r.status}</span> },
     { key: 'paidAt', label: 'Paid At', defaultWidth: 140, render: (r: any) => r.paidAt ? formatDate(r.paidAt) : '—', className: 'text-gray-500' },
     {
-      key: '_actions', label: 'Actions', defaultWidth: 100, sortable: false,
-      render: (r: any) => r.status === 'PENDING' ? <button onClick={() => markPaid(r.id)} className="text-xs text-green-600 hover:underline">Mark Paid</button> : null,
+      key: '_actions', label: 'Actions', defaultWidth: 140, sortable: false,
+      render: (r: any) => (
+        <div className="flex gap-3">
+          {r.status === 'PENDING' && <button onClick={() => markPaid(r.id)} className="text-xs text-green-600 hover:underline">Mark Paid</button>}
+          <button onClick={() => handleDelete(r)} className="text-xs text-red-600 hover:underline">Delete</button>
+        </div>
+      ),
     },
   ];
+
+  const canSubmit = !!preview && preview.commissionCount > 0 && !submitting;
 
   return (
     <div>
@@ -1645,6 +1704,7 @@ function PayoutsTab() {
               <h3 className="text-base font-semibold text-gray-900">New Payout</h3>
               <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
             </div>
+            <p className="text-xs text-gray-500 mb-3">Pays out every unpaid commission for the affiliate in the selected date range. Earnings inside the range are deducted from the affiliate's available balance.</p>
             <form onSubmit={handleCreate} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Affiliate</label>
@@ -1653,11 +1713,35 @@ function PayoutsTab() {
                   {affiliates.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
               </div>
-              <Input label="Amount" type="number" value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} required placeholder="0.00" />
-              <Input label="Period" value={form.period} onChange={(v) => setForm({ ...form, period: v })} required placeholder="e.g. March 2026" />
+              <div className="grid grid-cols-2 gap-2">
+                <Input label="Start Date" type="date" value={form.startDate} onChange={(v) => setForm({ ...form, startDate: v })} required />
+                <Input label="End Date" type="date" value={form.endDate} onChange={(v) => setForm({ ...form, endDate: v })} required />
+              </div>
               <Input label="Notes" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} placeholder="Optional" />
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={form.markPaid} onChange={(e) => setForm({ ...form, markPaid: e.target.checked })} />
+                Mark as paid immediately
+              </label>
+
+              <div className="bg-gray-50 border border-gray-200 rounded p-3 text-sm">
+                {!form.affiliateId ? (
+                  <span className="text-gray-500">Select an affiliate to preview the payout amount.</span>
+                ) : previewError ? (
+                  <span className="text-red-600">{previewError}</span>
+                ) : !preview ? (
+                  <span className="text-gray-500">Calculating…</span>
+                ) : preview.commissionCount === 0 ? (
+                  <span className="text-gray-500">No unpaid commissions in this range.</span>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">{preview.commissionCount} commission{preview.commissionCount === 1 ? '' : 's'} will be paid out</span>
+                    <span className="font-semibold text-gray-900">{formatMoney(preview.unpaidAmount)}</span>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2 pt-2">
-                <button type="submit" className="flex-1 bg-gray-900 text-white text-sm px-4 py-2.5 rounded hover:bg-gray-800 font-medium">Create</button>
+                <button type="submit" disabled={!canSubmit} className="flex-1 bg-gray-900 text-white text-sm px-4 py-2.5 rounded hover:bg-gray-800 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed">{submitting ? 'Creating…' : 'Create Payout'}</button>
                 <button type="button" onClick={() => setShowForm(false)} className="flex-1 text-sm text-gray-600 px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50">Cancel</button>
               </div>
             </form>
@@ -1676,6 +1760,7 @@ function PayoutsTab() {
                 <td className="px-4 py-3 text-gray-900 font-semibold text-sm" colSpan={2}>Total ({payouts.length} payouts)</td>
                 <td className="px-4 py-3 text-gray-900 font-semibold text-right text-sm">{formatMoney(payouts.reduce((s, p) => s + p.amount, 0))}</td>
                 <td className="px-4 py-3"></td>
+                <td className="px-4 py-3"></td>
                 <td className="px-4 py-3 text-gray-900 font-semibold text-sm">{payouts.filter(p => p.status === 'PAID').length} paid, {payouts.filter(p => p.status === 'PENDING').length} pending</td>
                 <td className="px-4 py-3" colSpan={2}></td>
               </tr>
@@ -1683,6 +1768,7 @@ function PayoutsTab() {
           ) : undefined}
         />
       </div>
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 }

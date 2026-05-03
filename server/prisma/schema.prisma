@@ -106,22 +106,28 @@ model OrderCommission {
   amount          Float
   sharePercent    Float    @default(1.0)
   createdAt       DateTime @default(now())
+  payoutId        String?
+  payout          Payout?  @relation(fields: [payoutId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([recipientUserId])
+  @@index([payoutId])
 }
 
 model Payout {
-  id          String       @id @default(uuid())
+  id          String            @id @default(uuid())
   affiliateId String
-  affiliate   User         @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  affiliate   User              @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
   amount      Float
   period      String
-  status      PayoutStatus @default(PENDING)
+  status      PayoutStatus      @default(PENDING)
   notes       String?
+  periodStart DateTime?
+  periodEnd   DateTime?
   paidAt      DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  commissions OrderCommission[]
 
   @@index([affiliateId])
 }

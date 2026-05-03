@@ -40,6 +40,7 @@ interface DashboardData {
     daily: { orders: number; revenue: number; earnings: number };
   };
   payouts: { pending: number; paid: number };
+  available: number;
 }
 
 interface Order {
@@ -174,7 +175,7 @@ export default function AffiliateDashboard() {
           <StatCard label="Today's Earnings" value={formatMoney(data.stats.daily.earnings)} sub={`${data.stats.daily.orders} orders`} />
           <StatCard label="This Month" value={formatMoney(data.stats.monthly.earnings)} sub={`${data.stats.monthly.orders} orders`} />
           <StatCard label="All Time Earnings" value={formatMoney(data.stats.total.earnings)} sub={`${data.stats.total.orders} orders`} />
-          <StatCard label="Pending Payout" value={formatMoney(data.payouts.pending)} sub={`${formatMoney(data.payouts.paid)} paid`} />
+          <StatCard label="Available Balance" value={formatMoney(data.available)} sub={`${formatMoney(data.payouts.paid)} paid out`} />
         </div>
 
         {/* Charts */}

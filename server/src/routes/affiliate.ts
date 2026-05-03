@@ -31,7 +31,8 @@ router.get('/dashboard', async (req: Request, res: Response) => {
     // Earnings are the sum of this affiliate's OrderCommission ledger rows
     // (accounts for commission splits). Revenue and order counts still come
     // from Order rows where this affiliate is credited (via OrderCommission).
-    const [totalEarnings, monthlyEarnings, dailyEarnings] = await Promise.all([
+    // Available = unpaid commissions (payoutId IS NULL).
+    const [totalEarnings, monthlyEarnings, dailyEarnings, availableEarnings] = await Promise.all([
       prisma.orderCommission.aggregate({
         where: { recipientUserId: userId },
         _sum: { amount: true },
@@ -42,6 +43,10 @@ router.get('/dashboard', async (req: Request, res: Response) => {
       }),
       prisma.orderCommission.aggregate({
         where: { recipientUserId: userId, createdAt: { gte: startOfDay } },
+        _sum: { amount: true },
+      }),
+      prisma.orderCommission.aggregate({
+        where: { recipientUserId: userId, payoutId: null },
         _sum: { amount: true },
       }),
     ]);
@@ -114,6 +119,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
         pending: pendingPayouts._sum.amount || 0,
         paid: paidPayouts._sum.amount || 0,
       },
+      available: availableEarnings._sum.amount || 0,
     });
   } catch (error) {
     console.error('Dashboard error:', error);
