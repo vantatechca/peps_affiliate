@@ -472,7 +472,10 @@ router.post('/orders/batch-delete', async (req: Request, res: Response) => {
 router.get('/payouts', async (_req: Request, res: Response) => {
   try {
     const payouts = await prisma.payout.findMany({
-      include: { affiliate: { select: { id: true, name: true, email: true } } },
+      include: {
+        affiliate: { select: { id: true, name: true, email: true } },
+        _count: { select: { commissions: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
     res.json(payouts);
@@ -482,23 +485,128 @@ router.get('/payouts', async (_req: Request, res: Response) => {
   }
 });
 
+// Parse a date input as the start (00:00) or end (23:59:59.999) of the day
+// in the server's local time. Inputs are expected as YYYY-MM-DD strings.
+function parseRangeBounds(startDate: string, endDate: string) {
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+function formatPeriodLabel(start: Date, end: Date) {
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  return `${fmt(start)} → ${fmt(end)}`;
+}
+
+// GET /api/admin/payouts/preview?affiliateId=...&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+// Returns the unpaid commission total in range so the admin can see what a
+// date-range payout would cover before creating it.
+router.get('/payouts/preview', async (req: Request, res: Response) => {
+  try {
+    const { affiliateId, startDate, endDate } = req.query as Record<string, string>;
+    if (!affiliateId || !startDate || !endDate) {
+      return res.status(400).json({ error: 'affiliateId, startDate, and endDate are required' });
+    }
+    const { start, end } = parseRangeBounds(startDate, endDate);
+
+    const where = {
+      recipientUserId: affiliateId,
+      payoutId: null,
+      createdAt: { gte: start, lte: end },
+    } as const;
+
+    const [agg, count] = await Promise.all([
+      prisma.orderCommission.aggregate({ where, _sum: { amount: true } }),
+      prisma.orderCommission.count({ where }),
+    ]);
+
+    res.json({
+      affiliateId,
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+      unpaidAmount: agg._sum.amount || 0,
+      commissionCount: count,
+    });
+  } catch (error) {
+    console.error('Payout preview error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/admin/payouts
+// Creates a payout that sweeps up every unpaid OrderCommission for the
+// affiliate within the given date range. The payout amount is the sum of
+// those commissions; the rows are linked to the new payout so they no
+// longer count toward the affiliate's available balance.
 router.post('/payouts', async (req: Request, res: Response) => {
   try {
-    const { affiliateId, amount, period, notes } = req.body;
+    const { affiliateId, startDate, endDate, notes, markPaid } = req.body;
 
-    if (!affiliateId || !amount || !period) {
-      return res.status(400).json({ error: 'affiliateId, amount, and period are required' });
+    if (!affiliateId || !startDate || !endDate) {
+      return res.status(400).json({ error: 'affiliateId, startDate, and endDate are required' });
     }
 
-    const payout = await prisma.payout.create({
-      data: { affiliateId, amount, period, notes: notes || null },
-      include: { affiliate: { select: { id: true, name: true } } },
+    const { start, end } = parseRangeBounds(startDate, endDate);
+    if (start > end) {
+      return res.status(400).json({ error: 'startDate must be on or before endDate' });
+    }
+
+    const payout = await prisma.$transaction(async (tx) => {
+      const unpaid = await tx.orderCommission.findMany({
+        where: {
+          recipientUserId: affiliateId,
+          payoutId: null,
+          createdAt: { gte: start, lte: end },
+        },
+        select: { id: true, amount: true },
+      });
+
+      const amount = unpaid.reduce((sum, c) => sum + c.amount, 0);
+      const period = formatPeriodLabel(start, end);
+      const status = markPaid ? 'PAID' : 'PENDING';
+
+      const created = await tx.payout.create({
+        data: {
+          affiliateId,
+          amount,
+          period,
+          periodStart: start,
+          periodEnd: end,
+          status,
+          paidAt: markPaid ? new Date() : null,
+          notes: notes || null,
+        },
+      });
+
+      if (unpaid.length > 0) {
+        await tx.orderCommission.updateMany({
+          where: { id: { in: unpaid.map((c) => c.id) } },
+          data: { payoutId: created.id },
+        });
+      }
+
+      return created;
     });
 
-    logAudit({ ...auditFromReq(req), action: 'CREATE_PAYOUT', entity: 'Payout', entityId: payout.id, details: { affiliateId, amount, period } });
+    const full = await prisma.payout.findUnique({
+      where: { id: payout.id },
+      include: {
+        affiliate: { select: { id: true, name: true } },
+        _count: { select: { commissions: true } },
+      },
+    });
 
-    res.status(201).json(payout);
+    logAudit({
+      ...auditFromReq(req),
+      action: 'CREATE_PAYOUT',
+      entity: 'Payout',
+      entityId: payout.id,
+      details: { affiliateId, startDate, endDate, amount: payout.amount, markPaid: !!markPaid },
+    });
+
+    res.status(201).json(full);
   } catch (error) {
     console.error('Create payout error:', error);
     logSystem({ level: 'ERROR', source: 'API', message: 'Create payout error', details: { error: String(error) } });
@@ -515,7 +623,6 @@ router.patch('/payouts/:id', async (req: Request, res: Response) => {
     if (paidAt !== undefined) data.paidAt = paidAt ? new Date(paidAt) : null;
     if (notes !== undefined) data.notes = notes;
 
-    // Auto-set paidAt when marking as PAID
     if (status === 'PAID' && !paidAt) {
       data.paidAt = new Date();
     }
@@ -523,7 +630,10 @@ router.patch('/payouts/:id', async (req: Request, res: Response) => {
     const payout = await prisma.payout.update({
       where: { id: req.params.id },
       data,
-      include: { affiliate: { select: { id: true, name: true } } },
+      include: {
+        affiliate: { select: { id: true, name: true } },
+        _count: { select: { commissions: true } },
+      },
     });
 
     logAudit({ ...auditFromReq(req), action: 'UPDATE_PAYOUT', entity: 'Payout', entityId: req.params.id, details: { changes: Object.keys(data), newStatus: status } });
@@ -532,6 +642,20 @@ router.patch('/payouts/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Update payout error:', error);
     logSystem({ level: 'ERROR', source: 'API', message: 'Update payout error', details: { error: String(error), payoutId: req.params.id } });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/admin/payouts/:id
+// Releases the linked commissions back into the unpaid pool (FK uses
+// ON DELETE SET NULL) so deleting a payout restores the affiliate's balance.
+router.delete('/payouts/:id', async (req: Request, res: Response) => {
+  try {
+    await prisma.payout.delete({ where: { id: req.params.id } });
+    logAudit({ ...auditFromReq(req), action: 'DELETE_PAYOUT', entity: 'Payout', entityId: req.params.id });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Delete payout error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -556,10 +680,13 @@ router.get('/stats', async (req: Request, res: Response) => {
       payoutWhere.affiliateId = affiliateId as string;
     }
 
+    const unpaidWhere: any = { payoutId: null };
+    if (affiliateId) unpaidWhere.recipientUserId = affiliateId as string;
+
     const [
       totalAffiliates, activeAffiliates, totalOrders, attributedOrders,
       totalRevenue, totalCommissions, pendingPayouts,
-      allOrdersRevenue, nonAttributedCount,
+      allOrdersRevenue, nonAttributedCount, unpaidCommissions,
     ] = await Promise.all([
       prisma.user.count({ where: { role: 'AFFILIATE' } }),
       prisma.user.count({ where: { role: 'AFFILIATE', active: true } }),
@@ -572,6 +699,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       prisma.payout.aggregate({ _sum: { amount: true }, where: payoutWhere }),
       prisma.order.aggregate({ _sum: { orderTotal: true } }),
       prisma.order.count({ where: { attributed: false } }),
+      prisma.orderCommission.aggregate({ _sum: { amount: true }, where: unpaidWhere }),
     ]);
 
     res.json({
@@ -582,6 +710,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       totalRevenue: totalRevenue._sum.orderTotal || 0,
       totalCommissions: totalCommissions._sum.commissionEarned || 0,
       pendingPayouts: pendingPayouts._sum.amount || 0,
+      unpaidCommissions: unpaidCommissions._sum.amount || 0,
       allOrdersRevenue: allOrdersRevenue._sum.orderTotal || 0,
       nonAttributedCount,
     });
